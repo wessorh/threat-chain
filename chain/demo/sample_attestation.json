@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "FILE",
+  "artifact_sha256": "53aa45cf908f57fa1f74627aa0b14964387c28e24b763bdf2b20a8228583f665",
+  "severity": "HIGH",
+  "confidence": 92,
+  "ttl_seconds": 604800,
+  "description": "Simulated ransomware dropper with C2 beaconing and file encryption behavior",
+  "tags": [
+    "ransomware",
+    "dropper",
+    "c2",
+    "persistence"
+  ],
+  "threat_category": [
+    "RANSOMWARE",
+    "TROJAN"
+  ],
+  "attester": "\u003cset --attester tatst1... or use 'tx attestation publish --from key'\u003e",
+  "published_at": 1773521755,
+  "expires_at": 1774126555,
+  "chain_id": "threatattest-1",
+  "file_size_bytes": 1220,
+  "file_name": "sample_malicious.txt"
+}

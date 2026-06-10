@@ -1,0 +1,142 @@
+# Copyright (c) 2026 by Support Intelligence, Inc. All rights reserved.
+
+# =============================================================================
+# .golangci.yml — golangci-lint configuration for ThreatAttest Chain
+# =============================================================================
+
+run:
+  timeout:       5m
+  tests:         true
+  modules-download-mode: readonly
+  skip-dirs:
+    - vendor/
+    - .git/
+    - dist/
+    - bin/
+
+output:
+  formats:
+    - format: colored-line-number
+  sort-results: true
+
+linters:
+  enable:
+    # Style & correctness
+    - gofmt
+    - goimports
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    # Security
+    - gosec
+    # Complexity
+    - cyclop
+    - gocognit
+    # Bugs
+    - nilerr
+    - bodyclose
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    # Code hygiene
+    - godot
+    - misspell
+    - whitespace
+    - unconvert
+    - unparam
+
+  disable:
+    - depguard    # no dependency restrictions yet
+    - exhaustruct # too noisy for SDK types
+    - wsl         # whitespace style too opinionated
+    - nlreturn    # conflicts with SDK style
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/threatattest/chain
+
+  gofmt:
+    simplify: true
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow    # too many false positives with Cosmos SDK patterns
+
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    exclude-functions:
+      - (*os.File).Close
+      - (io.Closer).Close
+
+  gosec:
+    excludes:
+      - G115    # integer overflow — expected with proto uint32
+      - G204    # subprocess with variable — expected in CLI
+      - G304    # file path from variable — expected in config loading
+    severity: medium
+    confidence: medium
+
+  cyclop:
+    max-complexity:  20
+    skip-tests:      true
+
+  gocognit:
+    min-complexity: 30
+
+  misspell:
+    locale: US
+
+  godot:
+    scope:    declarations
+    capital:  false
+    period:   true
+
+  staticcheck:
+    checks:
+      - "all"
+      - "-SA1019"  # deprecated: cosmos-sdk uses deprecated fields internally
+
+issues:
+  exclude-rules:
+    # Test files: relax some rules
+    - path: "_test\\.go"
+      linters:
+        - gosec
+        - errcheck
+        - cyclop
+
+    # Genesis files: often have complex switch/if chains
+    - path: "genesis\\.go"
+      linters:
+        - cyclop
+        - gocognit
+
+    # Module.go: RegisterInterfaces etc. are necessarily verbose
+    - path: "module\\.go"
+      linters:
+        - cyclop
+
+    # CLI files: cobra commands have complex args
+    - path: "cli/"
+      linters:
+        - cyclop
+        - gocognit
+
+    # Known proto-generated style
+    - text: "comment on exported"
+      linters:
+        - godot
+
+    # Cosmos SDK conventions
+    - text: "G101: Potential hardcoded credentials"
+      linters:
+        - gosec
+      source: "KeyPrefix|StoreKey|ModuleName"
+
+  max-issues-per-linter:  50
+  max-same-issues:        10
+  fix: false

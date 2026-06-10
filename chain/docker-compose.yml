@@ -1,0 +1,132 @@
+# Copyright (c) 2026 by Support Intelligence, Inc. All rights reserved.
+
+# =============================================================================
+# ThreatAttest — Docker Compose Stack
+# =============================================================================
+#
+# Services:
+#   node       — threatattestd single-node devnet
+#   prometheus — metrics collection (optional, profile: monitoring)
+#   grafana    — dashboard (optional, profile: monitoring)
+#
+# Usage:
+#   docker compose up -d                          # node only
+#   docker compose --profile monitoring up -d     # node + prometheus + grafana
+#   docker compose logs -f node                   # follow node logs
+#   docker compose down                           # stop all
+#   docker compose down -v                        # stop + wipe volumes
+# =============================================================================
+
+services:
+
+  # ── ThreatAttest Node ──────────────────────────────────────────────────────
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_VERSION: "${GIT_VERSION:-dev}"
+        GIT_COMMIT:  "${GIT_COMMIT:-unknown}"
+        BUILD_DATE:  "${BUILD_DATE:-}"
+    image: threatattest/threatattestd:${GIT_VERSION:-latest}
+    container_name: threatattestd
+    restart: unless-stopped
+
+    environment:
+      CHAIN_HOME:       /home/threatattest/.threatattestd
+      CHAIN_ID:         "${CHAIN_ID:-threatattest-local-1}"
+      MONIKER:          "${MONIKER:-docker-node}"
+      KEY_NAME:         "${KEY_NAME:-validator}"
+      DENOM:            "${DENOM:-utatst}"
+      STAKE_AMOUNT:     "${STAKE_AMOUNT:-100000000utatst}"
+      SUPPLY_AMOUNT:    "${SUPPLY_AMOUNT:-200000000utatst}"
+      KEYRING_BACKEND:  test
+      LOG_LEVEL:        "${LOG_LEVEL:-info}"
+      MINIMUM_GAS:      "0utatst"
+
+    ports:
+      - "${P2P_PORT:-26656}:26656"       # P2P
+      - "${RPC_PORT:-26657}:26657"       # RPC (CometBFT)
+      - "${REST_PORT:-1317}:1317"        # REST API
+      - "${GRPC_PORT:-9090}:9090"        # gRPC
+      - "${GRPC_WEB_PORT:-9091}:9091"   # gRPC-web
+
+    volumes:
+      - node_data:/home/threatattest/.threatattestd
+
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:26657/status"]
+      interval: 15s
+      timeout:  5s
+      retries:  10
+      start_period: 30s
+
+    networks:
+      - threatattest
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: ta-prometheus
+    profiles: [monitoring]
+    restart: unless-stopped
+
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+    ports:
+      - "9099:9090"
+
+    depends_on:
+      node:
+        condition: service_healthy
+
+    networks:
+      - threatattest
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: ta-grafana
+    profiles: [monitoring]
+    restart: unless-stopped
+
+    environment:
+      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-threatattest}"
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_SERVER_HTTP_PORT:        "3000"
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      - prometheus
+
+    networks:
+      - threatattest
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  node_data:
+    name: threatattestd_data
+  prometheus_data:
+    name: ta_prometheus_data
+  grafana_data:
+    name: ta_grafana_data
+
+# ─── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  threatattest:
+    name: threatattest_net
+    driver: bridge

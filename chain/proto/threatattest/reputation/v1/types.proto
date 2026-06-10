@@ -1,0 +1,30 @@
+syntax = "proto3";
+package threatattest.reputation.v1;
+
+option go_package = "github.com/threatattest/chain/x/reputation/types";
+
+// ReputationRecord stores a non-transferable reputation score per attester.
+message ReputationRecord {
+  string attester                     = 1;
+  uint32 reputation_score             = 2;
+  uint32 tier                         = 3;
+  uint64 total_attestations           = 4;
+  uint64 clean_expirations            = 5;
+  uint64 successful_disputes_against  = 6;
+  uint64 failed_disputes_against      = 7;
+  int64  last_activity_unix           = 8;
+}
+
+// Params holds x/reputation module parameters.
+message Params {
+  uint32 tier2_threshold   = 1; // default 1000
+  uint32 tier3_threshold   = 2; // default 10000
+  uint32 decay_start_days  = 3; // default 90
+  uint32 decay_rate_bps    = 4; // basis points per 30d, default 100 (1%)
+}
+
+// GenesisState defines the genesis state for x/reputation.
+message GenesisState {
+  Params                    params  = 1;
+  repeated ReputationRecord records = 2;
+}

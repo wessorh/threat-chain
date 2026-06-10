@@ -1,0 +1,148 @@
+syntax = "proto3";
+package threatattest.attestation.v1;
+
+option go_package = "github.com/threatattest/chain/x/attestation/types";
+
+// ArtifactType identifies the kind of artifact being attested.
+enum ArtifactType {
+  ARTIFACT_TYPE_UNSPECIFIED = 0;
+  ARTIFACT_TYPE_FILE        = 1;
+  ARTIFACT_TYPE_URL         = 2;
+  ARTIFACT_TYPE_IPV4        = 3;
+}
+
+// SeverityLevel is the threat severity classification.
+enum SeverityLevel {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO        = 1;
+  SEVERITY_LOW         = 2;
+  SEVERITY_MEDIUM      = 3;
+  SEVERITY_HIGH        = 4;
+  SEVERITY_CRITICAL    = 5;
+}
+
+// AttestationStatus tracks the lifecycle state of an attestation.
+enum AttestationStatus {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE      = 1;
+  STATUS_EXPIRED     = 2;
+  STATUS_REVOKED     = 3;
+  STATUS_DISPUTED    = 4;
+  STATUS_SUPERSEDED  = 5;
+}
+
+// TLPLevel is the Traffic Light Protocol sharing classification.
+enum TLPLevel {
+  TLP_UNSPECIFIED = 0;
+  TLP_WHITE       = 1;
+  TLP_GREEN       = 2;
+  TLP_AMBER       = 3;
+  TLP_RED         = 4;
+}
+
+// RuleType identifies the format of a detection rule.
+enum RuleType {
+  RULE_TYPE_UNSPECIFIED = 0;
+  RULE_TYPE_YARA        = 1;
+  RULE_TYPE_SIGMA       = 2;
+  RULE_TYPE_SNORT       = 3;
+  RULE_TYPE_SURICATA    = 4;
+  RULE_TYPE_OPENIOC     = 5;
+  RULE_TYPE_CUSTOM      = 6;
+}
+
+// RuleAppliesTo specifies which artifact field the rule targets.
+enum RuleAppliesTo {
+  APPLIES_TO_UNSPECIFIED = 0;
+  APPLIES_TO_FILE_BYTES  = 1;
+  APPLIES_TO_URL_PATH    = 2;
+  APPLIES_TO_URL_FULL    = 3;
+  APPLIES_TO_IP_TRAFFIC  = 4;
+  APPLIES_TO_ANY         = 5;
+}
+
+// DisputeGround enumerates formal grounds for a dispute.
+enum DisputeGround {
+  DISPUTE_GROUND_UNSPECIFIED          = 0;
+  DISPUTE_GROUND_FALSE_POSITIVE       = 1;
+  DISPUTE_GROUND_INCORRECT_SEVERITY   = 2;
+  DISPUTE_GROUND_FABRICATED_EVIDENCE  = 3;
+  DISPUTE_GROUND_STALE_REUSE          = 4;
+  DISPUTE_GROUND_SYBIL_ATTACK         = 5;
+}
+
+// DetectionRuleRef anchors a detection rule stored on IPFS to an attestation.
+message DetectionRuleRef {
+  // rule_id = SHA-256(rule_ipfs_cid_bytes || rule_sha256_bytes), set by keeper.
+  string rule_id            = 1;
+  RuleType rule_type        = 2;
+  string rule_name          = 3;
+  string rule_ipfs_cid      = 4;
+  string rule_sha256        = 5;
+  string rule_version       = 6;
+  string rule_author        = 7;
+  RuleAppliesTo applies_to  = 8;
+  string min_yara_version   = 9;
+  bool   verified           = 10;
+}
+
+// AttestationRecord is the canonical on-chain threat intelligence record.
+message AttestationRecord {
+  string            attestation_id    = 1;
+  uint32            schema_version    = 2;
+  ArtifactType      artifact_type     = 3;
+  string            artifact_sha256   = 4;
+  string            artifact_value    = 5;
+  int64             published_at      = 6;
+  uint32            ttl_seconds       = 7;
+  int64             expires_at        = 8;
+  SeverityLevel     severity          = 9;
+  uint32            confidence        = 10;
+  repeated string   threat_category   = 11;
+  repeated string   tags              = 12;
+  string            attester          = 13;
+  repeated DetectionRuleRef detection_rules = 14;
+  string            supersedes        = 15;
+  repeated string   related_to        = 16;
+  string            description       = 17;
+  TLPLevel          tlp_level         = 18;
+  uint64            block_height      = 19;
+  string            tx_hash           = 20;
+  AttestationStatus status            = 21;
+  uint32            endorsement_count = 22;
+  uint32            dispute_count     = 23;
+}
+
+// Params holds x/attestation module parameters.
+message Params {
+  string min_attester_delegation     = 1; // utatst, as integer string
+  uint32 min_ttl_seconds             = 2;
+  uint32 max_ttl_seconds             = 3;
+  uint32 max_ttl_ipv4_seconds        = 4;
+  uint32 max_detection_rules         = 5;
+  uint32 max_attestations_per_epoch  = 6;
+  string dispute_bond_amount         = 7; // utatst, as integer string
+  uint32 ipv4_min_confidence         = 8;
+  uint32 timestamp_tolerance_seconds = 9;
+}
+
+// DisputeRecord tracks an open dispute.
+message DisputeRecord {
+  string        dispute_id       = 1;
+  string        attestation_id   = 2;
+  string        challenger        = 3;
+  DisputeGround ground           = 4;
+  string        reason           = 5;
+  string        evidence_cid     = 6;
+  int64         opened_at        = 7;
+  uint64        opened_height    = 8;
+  string        rebuttal_cid     = 9;
+  string        status           = 10; // "OPEN", "RESOLVED_UPHELD", "RESOLVED_REJECTED", "DISMISSED"
+}
+
+// GenesisState defines the genesis state for x/attestation.
+message GenesisState {
+  Params                   params       = 1;
+  repeated AttestationRecord attestations = 2;
+  repeated DisputeRecord   disputes     = 3;
+}

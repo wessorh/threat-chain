@@ -1,0 +1,48 @@
+{
+  "name": "threatattest-shield",
+  "version": "1.0.0",
+  "description": "ThreatAttest Shield — browser extension build tooling",
+  "private": true,
+  "scripts": {
+    "lint":        "eslint src/ popup.js --ext .js",
+    "lint:fix":    "eslint src/ popup.js --ext .js --fix",
+    "test":        "node ../threatattest/tests/test_extension_badges.js",
+    "test:watch":  "node --watch ../threatattest/tests/test_extension_badges.js",
+    "build":       "node scripts/build.js",
+    "build:dev":   "node scripts/build.js --dev",
+    "pack":        "node scripts/build.js && node scripts/pack.js",
+    "pack:dev":    "node scripts/build.js --dev && node scripts/pack.js --dev",
+    "clean":       "node -e \"const fs=require('fs'); ['dist','build'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch(e){}})\"",
+    "validate":    "node scripts/validate.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  },
+  "eslintConfig": {
+    "env": {
+      "browser":    true,
+      "es2022":     true,
+      "webextensions": true,
+      "serviceworker": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2022,
+      "sourceType":  "module"
+    },
+    "globals": {
+      "chrome": "readonly"
+    },
+    "rules": {
+      "no-unused-vars":  ["warn", { "argsIgnorePattern": "^_" }],
+      "no-console":      "off",
+      "semi":            ["error", "always"],
+      "quotes":          ["warn", "single", { "avoidEscape": true }],
+      "eqeqeq":          "error",
+      "no-var":          "error",
+      "prefer-const":    "warn"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

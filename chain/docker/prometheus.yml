@@ -1,0 +1,21 @@
+# Copyright (c) 2026 by Support Intelligence, Inc. All rights reserved.
+
+# Prometheus configuration for ThreatAttest monitoring
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    chain_id: 'threatattest-local-1'
+
+scrape_configs:
+  # CometBFT metrics
+  - job_name: 'cometbft'
+    static_configs:
+      - targets: ['node:26660']
+    metrics_path: /metrics
+
+  # Cosmos SDK app metrics (via prometheus endpoint)
+  - job_name: 'threatattestd'
+    static_configs:
+      - targets: ['node:1317']
+    metrics_path: /metrics

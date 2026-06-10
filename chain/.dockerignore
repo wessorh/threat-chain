@@ -1,0 +1,49 @@
+# =============================================================================
+# .dockerignore — Exclude files from Docker build context
+# =============================================================================
+
+# Build artefacts
+bin/
+dist/
+
+# Test output
+*.out
+*.test
+
+# Development tools
+.git/
+.github/
+
+# Local devnet state
+.threatattestd-local/
+.threatattestd-demo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Demo files (not needed in image)
+demo/
+tests/
+
+# Documentation
+docs/
+*.md
+*.html
+
+# Node.js (extension — not part of chain build)
+threatattest-extension/
+node_modules/
+
+# Test data
+testutil/

@@ -1,0 +1,184 @@
+# Copyright (c) 2026 by Support Intelligence, Inc. All rights reserved.
+
+# =============================================================================
+# release.yml — ThreatAttest Chain Release Pipeline
+# =============================================================================
+#
+# Triggers on semver tags: v*.*.* (e.g. v0.1.0, v1.2.3-rc1)
+#
+# Jobs:
+#   goreleaser   — multi-arch binaries + Docker image + GitHub Release
+#   docker       — push image to ghcr.io (fallback if goreleaser not configured)
+#   ext-release  — package and attach browser extension zip to the release
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"  # pre-release: rc, beta, alpha
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0)"
+        required: true
+        type: string
+
+env:
+  GO_VERSION:   "1.23"
+  NODE_VERSION: "20"
+  REGISTRY:     ghcr.io
+  IMAGE_NAME:   ${{ github.repository_owner }}/threatattestd
+
+jobs:
+  # ─── GoReleaser (binaries + GitHub Release) ───────────────────────────────
+  goreleaser:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents:  write     # create GitHub Release
+      packages:  write     # push to ghcr.io
+      id-token:  write     # OIDC for signing (cosign)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required for git describe
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: chain/go.sum
+
+      - name: Set up QEMU (for ARM cross-compilation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version:       latest
+          args:          release --clean
+          workdir:       threatattest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload dist artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name:  goreleaser-dist
+          path:  threatattest/dist/
+          retention-days: 30
+
+  # ─── Browser Extension packaging ─────────────────────────────────────────
+  ext-release:
+    name: Extension Release
+    runs-on: ubuntu-latest
+    needs: goreleaser
+    permissions:
+      contents: write   # attach assets to existing release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Validate extension
+        working-directory: extension
+        run: node scripts/validate.js
+
+      - name: Run extension tests
+        working-directory: chain
+        run: node tests/test_extension_badges.js
+
+      - name: Build extension
+        working-directory: extension
+        run: node scripts/build.js
+
+      - name: Package extension
+        working-directory: extension
+        run: node scripts/pack.js
+
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"       >> "$GITHUB_OUTPUT"
+
+      - name: Upload extension zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: |
+            threatattest-extension/build/threatattest-shield-*.zip
+            threatattest-extension/build/threatattest-shield-*.zip.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── Docker image (fallback / direct push) ───────────────────────────────
+  docker:
+    name: Docker Image
+    runs-on: ubuntu-latest
+    if: ${{ false }}   # disabled by default; goreleaser handles this
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context:    threatattest
+          file:       threatattest/Dockerfile
+          platforms:  linux/amd64,linux/arm64
+          push:       true
+          tags:       ${{ steps.meta.outputs.tags }}
+          labels:     ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+          build-args: |
+            GIT_VERSION=${{ github.ref_name }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}

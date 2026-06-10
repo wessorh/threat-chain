@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest — Publishing Workflow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d1117;
+    --bg2:      #161b22;
+    --bg3:      #21262d;
+    --border:   #30363d;
+    --text:     #e6edf3;
+    --text2:    #8b949e;
+    --accent:   #58a6ff;
+    --green:    #3fb950;
+    --purple:   #d2a8ff;
+    --orange:   #ffa657;
+    --red:      #ff7b72;
+    --yellow:   #e3b341;
+    --cyan:     #79c0ff;
+    --mono:     'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
+    --sans:     -apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif;
+    --r:        6px;
+  }
+
+  html { font-size: 15px; scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.7; }
+
+  /* Layout */
+  .page { max-width: 900px; margin: 0 auto; padding: 2.5rem 2rem 5rem; }
+
+  /* Typography */
+  h1 { font-size: 2rem; font-weight: 800; letter-spacing: -.03em; margin-bottom: .3rem; }
+  h2 { font-size: 1.35rem; font-weight: 700; margin: 2.5rem 0 .8rem; padding-bottom: .4rem;
+       border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; font-weight: 600; color: var(--cyan); margin: 1.6rem 0 .5rem; }
+  h4 { font-size: .9rem; font-weight: 600; color: var(--purple); margin: 1.2rem 0 .35rem; }
+  p  { margin: .5rem 0; }
+  a  { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Step badges */
+  .step-header {
+    display: flex; align-items: center; gap: .75rem;
+    margin: 2rem 0 .6rem;
+  }
+  .step-num {
+    width: 2rem; height: 2rem; border-radius: 50%;
+    background: var(--accent); color: #000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .8rem; font-weight: 800; flex-shrink: 0;
+  }
+  .step-header h2 {
+    border: none; margin: 0; padding: 0; font-size: 1.2rem;
+  }
+
+  /* Phase dividers */
+  .phase {
+    border-left: 3px solid var(--border);
+    padding-left: 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .phase.ipfs  { border-color: var(--orange); }
+  .phase.chain { border-color: var(--accent);  }
+  .phase.verify{ border-color: var(--green);   }
+
+  /* Code */
+  pre {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--r);
+    padding: .9rem 1.1rem; overflow-x: auto; margin: .6rem 0;
+    font-family: var(--mono); font-size: .79rem; line-height: 1.65;
+  }
+  code {
+    font-family: var(--mono); font-size: .82em;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 3px; padding: .1em .35em; color: var(--purple);
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: inherit; }
+
+  /* Syntax colours */
+  .cm  { color: #8b949e; font-style: italic; }
+  .kw  { color: var(--red); }
+  .ty  { color: var(--cyan); }
+  .str { color: #a5d6ff; }
+  .num { color: var(--purple); }
+  .fld { color: var(--orange); }
+  .fn  { color: var(--purple); }
+  .ok  { color: var(--green); }
+  .hi  { color: var(--yellow); font-weight: 600; }
+
+  /* Tables */
+  .tw { overflow-x: auto; margin: .6rem 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  thead tr { background: var(--bg3); border-bottom: 2px solid var(--border); }
+  th { text-align: left; padding: .5rem .8rem; color: var(--text2);
+       font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  td { padding: .45rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+
+  /* Callouts */
+  .note, .warn, .tip, .danger {
+    display: flex; gap: .65rem; padding: .8rem 1rem;
+    border-radius: var(--r); margin: .7rem 0; font-size: .84rem;
+  }
+  .note   { background: rgba(88,166,255,.08);  border-left: 3px solid var(--accent);  }
+  .tip    { background: rgba(63,185,80,.08);   border-left: 3px solid var(--green);   }
+  .warn   { background: rgba(227,179,65,.08);  border-left: 3px solid var(--yellow);  }
+  .danger { background: rgba(255,123,114,.08); border-left: 3px solid var(--red);     }
+  .note .ic, .warn .ic, .tip .ic, .danger .ic { font-size: 1rem; flex-shrink: 0; padding-top: .05rem; }
+  .note b, .warn b, .tip b, .danger b { display: block; margin-bottom: .15rem; }
+
+  /* Flow diagram */
+  .flow {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 1.4rem 1.6rem; margin: 1rem 0;
+    display: flex; flex-direction: column; gap: .3rem; font-family: var(--mono); font-size: .8rem;
+  }
+  .flow-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .flow-box {
+    padding: .3rem .75rem; border-radius: 4px; font-weight: 700; white-space: nowrap;
+  }
+  .fb-local  { background: rgba(88,166,255,.12);  border: 1px solid rgba(88,166,255,.3);  color: var(--accent);  }
+  .fb-ipfs   { background: rgba(255,166,87,.12);  border: 1px solid rgba(255,166,87,.3);  color: var(--orange);  }
+  .fb-chain  { background: rgba(63,185,80,.12);   border: 1px solid rgba(63,185,80,.3);   color: var(--green);   }
+  .fb-verify { background: rgba(210,168,255,.12); border: 1px solid rgba(210,168,255,.3); color: var(--purple);  }
+  .fb-query  { background: rgba(121,192,255,.12); border: 1px solid rgba(121,192,255,.3); color: var(--cyan);    }
+  .flow-arr  { color: var(--text2); font-size: 1.1rem; }
+  .flow-label{ color: var(--text2); font-size: .72rem; font-style: italic; }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg,#0d1b2a 0%,#1a2744 60%,#0d1117 100%);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.8rem 2rem; margin-bottom: 2rem; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content:''; position:absolute; top:-50px; right:-50px;
+    width:200px; height:200px;
+    background: radial-gradient(circle,rgba(88,166,255,.1) 0%,transparent 70%);
+    pointer-events: none;
+  }
+  .hero p { color: var(--text2); font-size: .92rem; max-width: 640px; margin-top: .5rem; }
+  .hero .tags { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: 1rem; }
+  .tag {
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    padding: .15rem .55rem; border-radius: 4px;
+  }
+  .tg { background:rgba(63,185,80,.12);   border:1px solid rgba(63,185,80,.3);   color:var(--green); }
+  .tb { background:rgba(88,166,255,.12);  border:1px solid rgba(88,166,255,.3);  color:var(--accent);}
+  .to { background:rgba(255,166,87,.12);  border:1px solid rgba(255,166,87,.3);  color:var(--orange);}
+  .tp { background:rgba(210,168,255,.12); border:1px solid rgba(210,168,255,.3); color:var(--purple);}
+
+  /* Two-column */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: .6rem 0; }
+  @media(max-width:640px){ .two { grid-template-columns:1fr; } }
+
+  /* Card */
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 1rem 1.2rem;
+  }
+  .card h4 { margin-top: 0; }
+
+  /* Separator */
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* TOC */
+  .toc {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 1rem 1.4rem; margin-bottom: 2rem;
+    font-size: .83rem;
+  }
+  .toc h3 { margin-top: 0; font-size: .85rem; color: var(--text2); }
+  .toc ol { padding-left: 1.2rem; }
+  .toc li { margin: .2rem 0; }
+
+  /* Inline badge */
+  .badge {
+    display: inline-block; padding: .1rem .4rem;
+    border-radius: 3px; font-family: var(--mono); font-size: .72rem; font-weight: 700;
+  }
+  .br { background:rgba(255,123,114,.12); border:1px solid rgba(255,123,114,.3); color:var(--red); }
+  .bg { background:rgba(63,185,80,.12);   border:1px solid rgba(63,185,80,.3);   color:var(--green); }
+  .bb { background:rgba(88,166,255,.12);  border:1px solid rgba(88,166,255,.3);  color:var(--accent); }
+  .bo { background:rgba(255,166,87,.12);  border:1px solid rgba(255,166,87,.3);  color:var(--orange); }
+</style>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<div class="page">
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <h1>Publishing Metadata &amp; IPFS Artefacts</h1>
+  <p>
+    A step-by-step guide to the complete ThreatAttest publishing workflow:
+    pinning the artefact and detection rules on IPFS, constructing and signing
+    the <code>MsgPublishAttestation</code> transaction, broadcasting it to the
+    chain, and understanding how validators verify IPFS content on-chain.
+  </p>
+  <div class="tags">
+    <span class="tag tg">x/attestation</span>
+    <span class="tag to">x/ipfsverify</span>
+    <span class="tag tb">MsgPublishAttestation</span>
+    <span class="tag tp">DetectionRuleRef</span>
+    <span class="tag tg">CIDv1</span>
+  </div>
+</div>
+
+<!-- ── TOC ── -->
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#overview">Conceptual overview</a></li>
+    <li><a href="#step1">Step 1 — Hash the artefact</a></li>
+    <li><a href="#step2">Step 2 — Pin content to IPFS</a></li>
+    <li><a href="#step3">Step 3 — Build the attestation spec</a></li>
+    <li><a href="#step4">Step 4 — Sign the attester payload</a></li>
+    <li><a href="#step5">Step 5 — Broadcast MsgPublishAttestation</a></li>
+    <li><a href="#step6">Step 6 — On-chain processing (keeper)</a></li>
+    <li><a href="#step7">Step 7 — IPFS verification job lifecycle</a></li>
+    <li><a href="#step8">Step 8 — Query the result</a></li>
+    <li><a href="#artifacts">Artefact type reference (FILE / URL / IPv4)</a></li>
+    <li><a href="#full-example">Full end-to-end shell example</a></li>
+  </ol>
+</div>
+
+<!-- ── OVERVIEW ── -->
+<h2 id="overview">Conceptual Overview</h2>
+
+<p>
+  ThreatAttest uses a two-layer data model. <strong>Metadata</strong> (severity,
+  confidence, tags, description, attester identity, TTL) is stored directly
+  on-chain in a <code>AttestationRecord</code>. <strong>Large artefacts</strong>
+  — detection rules such as YARA signatures, Sigma rules, or Snort rules — are
+  stored off-chain on IPFS and <em>referenced</em> on-chain via a
+  <code>DetectionRuleRef</code> that contains the CIDv1 address and the expected
+  SHA-256 of the content. Validators run IPFS nodes and independently verify
+  that the CID content matches the declared hash.
+</p>
+
+<div class="flow">
+  <div class="flow-row">
+    <div class="flow-box fb-local">Local File / Rule</div>
+    <span class="flow-arr">→</span>
+    <div>
+      <div class="flow-box fb-local">sha256(bytes)</div>
+      <div class="flow-label">artifact_sha256</div>
+    </div>
+    <span class="flow-arr">→</span>
+    <div>
+      <div class="flow-box fb-ipfs">ipfs add (CIDv1)</div>
+      <div class="flow-label">rule_ipfs_cid</div>
+    </div>
+    <span class="flow-arr">→</span>
+    <div>
+      <div class="flow-box fb-chain">MsgPublishAttestation</div>
+      <div class="flow-label">broadcast to chain</div>
+    </div>
+  </div>
+  <div class="flow-row" style="margin-top:.5rem">
+    <span style="color:var(--text2);margin-left:2rem">↓</span>
+    <span style="color:var(--text2);margin-left:14rem">↓</span>
+  </div>
+  <div class="flow-row">
+    <div class="flow-box fb-verify" style="margin-left:1.5rem">AttestationRecord stored</div>
+    <span class="flow-arr" style="margin-left:8rem">+</span>
+    <div class="flow-box fb-verify">VerificationJob created</div>
+  </div>
+  <div class="flow-row" style="margin-top:.5rem">
+    <span style="color:var(--text2);margin-left:20rem">↓</span>
+  </div>
+  <div class="flow-row">
+    <div class="flow-box fb-verify" style="margin-left:16rem">Validators fetch CID → submit report</div>
+  </div>
+  <div class="flow-row" style="margin-top:.5rem">
+    <span style="color:var(--text2);margin-left:20rem">↓ ≥3 confirmations</span>
+  </div>
+  <div class="flow-row">
+    <div class="flow-box fb-query" style="margin-left:16rem">DetectionRuleRef.verified = true</div>
+  </div>
+</div>
+
+<div class="note">
+  <span class="ic">ℹ</span>
+  <div>
+    <b>What goes on-chain vs IPFS</b>
+    The chain stores only hashes and metadata — never raw file bytes.
+    The actual malware sample, YARA rule text, or Sigma YAML stays on IPFS.
+    The chain acts as the tamper-evident index; IPFS provides content-addressable storage.
+  </div>
+</div>
+
+<hr>
+
+<!-- ── STEP 1 ── -->
+<div class="step-header" id="step1">
+  <div class="step-num">1</div>
+  <h2>Hash the Artefact</h2>
+</div>
+
+<p>
+  Before doing anything else, compute the SHA-256 of the file (or derive it for
+  URL/IPv4 artefacts). This hash is the primary key for every query — it is what
+  endpoint agents will look up when scanning a file, URL, or IP address.
+</p>
+
+<div class="phase chain">
+<h3>For a FILE</h3>
+<pre><span class="cm"># Standard sha256sum (Linux)</span>
+SHA256=$(sha256sum malware.bin | awk '{print $1}')
+echo $SHA256
+<span class="ok"># e.g. 53aa45cf908f57fa1f74627aa0b14964387c28e24b763bdf2b20a8228583f665</span>
+
+<span class="cm"># Or use the built-in attest-file command (recommended — validates all params too)</span>
+threatattestd attest-file malware.bin \
+  --severity HIGH --confidence 92 --ttl 604800 \
+  --description "Ransomware dropper — AES-256 encryption, C2 beaconing" \
+  --tags "ransomware,dropper,c2" \
+  --category "TATST:RANSOMWARE,TATST:DROPPER" \
+  --output attestation.json
+
+SHA256=$(jq -r '.artifact_sha256' attestation.json)</pre>
+
+<div class="note">
+  <span class="ic">ℹ</span>
+  <div>
+    <b>attest-file is the recommended entry point</b>
+    It computes the hash, validates every parameter, and writes the complete
+    <code>AttestationSpec</code> JSON in one step.
+    The <code>artifact_sha256</code> field in the output is always authoritative.
+  </div>
+</div>
+</div>
+
+<div class="phase chain">
+<h3>For a URL</h3>
+<p>
+  URLs are normalised before hashing. The normalisation rules (from
+  <code>types.NormalizeURL</code>) are:
+</p>
+<ul style="margin:.4rem 0 .6rem 1.2rem">
+  <li>Scheme and host are lowercased</li>
+  <li>Default ports stripped (80 for HTTP, 443 for HTTPS)</li>
+  <li>Query parameters sorted lexicographically</li>
+  <li>Fragment (<code>#…</code>) stripped</li>
+</ul>
+<pre><span class="cm"># Compute the canonical SHA-256 for a URL artifact</span>
+URL="https://malicious.example.com/payload?stage=2&amp;id=abc"
+
+<span class="cm"># Normalise: lowercase scheme+host, sort query params, strip fragment</span>
+NORM_URL="https://malicious.example.com/payload?id=abc&amp;stage=2"
+
+SHA256=$(echo -n "$NORM_URL" | sha256sum | awk '{print $1}')
+echo "URL SHA-256: $SHA256"</pre>
+
+<div class="warn">
+  <span class="ic">⚠</span>
+  <div>
+    <b>SHA-256 must match the normalised URL exactly</b>
+    The keeper's <code>ValidateBasic</code> re-normalises <code>raw_value</code>
+    and recomputes the hash. If <code>artifact_sha256 ≠ sha256(normalize(raw_value))</code>
+    the transaction is rejected with <code>ErrSHA256Mismatch</code> (code 38).
+  </div>
+</div>
+</div>
+
+<div class="phase chain">
+<h3>For an IPv4 Address</h3>
+<pre><span class="cm"># IPv4: SHA-256 of the dotted-decimal string bytes</span>
+IP="203.0.113.42"
+SHA256=$(echo -n "$IP" | sha256sum | awk '{print $1}')
+echo "IPv4 SHA-256: $SHA256"</pre>
+
+<div class="warn">
+  <span class="ic">⚠</span>
+  <div>
+    <b>IANA reserved ranges are blocked</b>
+    Addresses in 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+    169.254.0.0/16, 224.0.0.0/4, and 255.255.255.255 are rejected with
+    <code>ErrReservedIPv4</code> (code 12). Use only public routable addresses.
+    IPv4 attestations also require <code>confidence ≥ 60</code> and
+    <code>ttl ≤ 7,776,000</code> seconds (90 days).
+  </div>
+</div>
+</div>
+
+<hr>
+
+<!-- ── STEP 2 ── -->
+<div class="step-header" id="step2">
+  <div class="step-num">2</div>
+  <h2>Pin Content to IPFS (Optional but Recommended)</h2>
+</div>
+
+<p>
+  If you want to attach detection rules (YARA, Sigma, Snort, Suricata, OpenIOC)
+  to the attestation, upload them to IPFS first and record the CIDv1 and
+  content SHA-256. These are embedded as <code>DetectionRuleRef</code> entries
+  in the attestation message.
+</p>
+
+<div class="phase ipfs">
+<h3>2a — Upload a YARA rule to IPFS</h3>
+<pre><span class="cm"># Create a YARA rule file</span>
+cat &gt; ransomware_dropper.yar &lt;&lt; 'EOF'
+rule RansomwareDropper {
+    meta:
+        description = "Ransomware dropper — C2 beacon + AES-256 encryption"
+        author      = "analyst@example.com"
+        date        = "2025-05-14"
+    strings:
+        $c2  = "malicious.example.com"
+        $aes = { 60 50 D8 AB }
+        $reg = "CurrentVersion\\Run"
+    condition:
+        all of them
+}
+EOF
+
+<span class="cm"># Compute the SHA-256 of the rule file</span>
+RULE_SHA256=$(sha256sum ransomware_dropper.yar | awk '{print $1}')
+echo "Rule SHA-256: $RULE_SHA256"
+
+<span class="cm"># Add to IPFS — the --cid-version=1 flag is REQUIRED (CIDv0 is rejected by the chain)</span>
+RULE_CID=$(ipfs add --cid-version=1 --quieter ransomware_dropper.yar)
+echo "Rule CIDv1: $RULE_CID"
+<span class="ok"># e.g. bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi</span>
+
+<span class="cm"># Verify the CID starts with 'b' (CIDv1 base32)</span>
+[[ "$RULE_CID" == b* ]] &amp;&amp; echo "Valid CIDv1" || echo "ERROR: Not a CIDv1"</pre>
+</div>
+
+<div class="phase ipfs">
+<h3>2b — Pin to a persistent IPFS node</h3>
+<pre><span class="cm"># Pin locally so the content stays available to validators</span>
+ipfs pin add "$RULE_CID"
+
+<span class="cm"># Optional: also pin via a pinning service (Pinata, web3.storage, etc.)</span>
+<span class="cm"># This ensures validators can fetch the content even if your node goes offline</span>
+curl -X POST "https://api.pinata.cloud/pinning/pinByHash" \
+  -H "Authorization: Bearer $PINATA_JWT" \
+  -H "Content-Type: application/json" \
+  -d "{&quot;hashToPin&quot;: &quot;$RULE_CID&quot;, &quot;pinataMetadata&quot;: {&quot;name&quot;: &quot;ransomware_dropper.yar&quot;}}"</pre>
+</div>
+
+<div class="phase ipfs">
+<h3>2c — Upload multiple rule files</h3>
+<pre><span class="cm"># You can attach up to 10 detection rules per attestation (max_detection_rules param)</span>
+SIGMA_CID=$(ipfs add --cid-version=1 --quieter ransomware_sigma.yml)
+SIGMA_SHA=$(sha256sum ransomware_sigma.yml | awk '{print $1}')
+
+SNORT_CID=$(ipfs add --cid-version=1 --quieter ransomware.rules)
+SNORT_SHA=$(sha256sum ransomware.rules | awk '{print $1}')</pre>
+</div>
+
+<div class="tip">
+  <span class="ic">✓</span>
+  <div>
+    <b>CIDv1 is mandatory — CIDv0 is rejected</b>
+    The chain validates CIDv1 with the regex <code>^b[a-z2-7]{58,}$</code>.
+    Always pass <code>--cid-version=1</code> to <code>ipfs add</code>.
+    CIDv0 strings (starting with <code>Qm</code>) are rejected with
+    <code>ErrCIDv0Deprecated</code> (code 16).
+  </div>
+</div>
+
+<hr>
+
+<!-- ── STEP 3 ── -->
+<div class="step-header" id="step3">
+  <div class="step-num">3</div>
+  <h2>Build the Attestation Spec</h2>
+</div>
+
+<p>
+  Assemble the complete <code>MsgPublishAttestation</code> payload. Every field
+  is validated by <code>ValidateBasic</code> before the transaction is accepted
+  by the mempool.
+</p>
+
+<div class="phase chain">
+<h3>Full MsgPublishAttestation structure</h3>
+<pre>{
+  <span class="fld">"attester"</span>:          <span class="str">"tatst1abc123..."</span>,          <span class="cm">// required: bech32 tatst1… address</span>
+  <span class="fld">"artifact_type"</span>:     <span class="str">"FILE"</span>,                     <span class="cm">// required: FILE | URL | IPV4</span>
+  <span class="fld">"artifact_sha256"</span>:   <span class="str">"53aa45cf..."</span>,              <span class="cm">// required: 64-char hex SHA-256</span>
+  <span class="fld">"raw_value"</span>:         <span class="str">""</span>,                         <span class="cm">// required for URL/IPV4; empty for FILE</span>
+  <span class="fld">"severity"</span>:          <span class="str">"HIGH"</span>,                     <span class="cm">// required: UNSPECIFIED|INFO|LOW|MEDIUM|HIGH|CRITICAL</span>
+  <span class="fld">"tlp"</span>:               <span class="str">"TLP_WHITE"</span>,                <span class="cm">// optional: TLP sharing classification</span>
+  <span class="fld">"ttl_seconds"</span>:       <span class="num">604800</span>,                     <span class="cm">// required: 3600–31536000 (1h – 365d)</span>
+  <span class="fld">"confidence"</span>:        <span class="num">92</span>,                         <span class="cm">// required: 0–100</span>
+  <span class="fld">"description"</span>:       <span class="str">"Ransomware dropper..."</span>,    <span class="cm">// optional: max 1024 bytes, no HTML</span>
+  <span class="fld">"tags"</span>:              [<span class="str">"ransomware"</span>, <span class="str">"dropper"</span>],  <span class="cm">// optional: max 16, each ≤32 bytes</span>
+  <span class="fld">"threat_categories"</span>: [<span class="str">"TATST:RANSOMWARE"</span>],       <span class="cm">// optional: max 8 TATST codes or MITRE IDs</span>
+  <span class="fld">"mitre_attack_ids"</span>:  [<span class="str">"T1486"</span>, <span class="str">"TA0040"</span>],       <span class="cm">// optional: MITRE ATT&amp;CK tactic/technique IDs</span>
+  <span class="fld">"related_to"</span>:        [<span class="str">"&lt;other-attestation-id&gt;"</span>],<span class="cm">// optional: max 32 related attestation IDs</span>
+  <span class="fld">"detection_rules"</span>: [                              <span class="cm">// optional: max 10 IPFS-linked rules</span>
+    {
+      <span class="fld">"rule_type"</span>:       <span class="str">"YARA"</span>,
+      <span class="fld">"rule_name"</span>:       <span class="str">"RansomwareDropper"</span>,
+      <span class="fld">"rule_ipfs_cid"</span>:   <span class="str">"bafybeig..."</span>,              <span class="cm">// CIDv1 — must start with 'b'</span>
+      <span class="fld">"rule_sha256"</span>:     <span class="str">"a1b2c3..."</span>,               <span class="cm">// SHA-256 of rule file bytes</span>
+      <span class="fld">"rule_version"</span>:    <span class="str">"1.0.0"</span>,
+      <span class="fld">"rule_author"</span>:     <span class="str">"analyst@example.com"</span>,
+      <span class="fld">"applies_to"</span>:      <span class="str">"FILE_BYTES"</span>,
+      <span class="fld">"min_yara_version"</span>:<span class="str">"4.0"</span>
+    }
+  ],
+  <span class="fld">"attester_sig"</span>: <span class="str">"&lt;128-char hex secp256k1 signature&gt;"</span>  <span class="cm">// required: see Step 4</span>
+}</pre>
+
+<h4>Field limits at a glance</h4>
+<div class="tw">
+<table>
+  <thead><tr><th>Field</th><th>Limit</th><th>Error if exceeded</th></tr></thead>
+  <tbody>
+    <tr><td><code>description</code></td><td>1 024 bytes</td><td><code>ErrDescriptionTooLong</code></td></tr>
+    <tr><td><code>tags</code></td><td>16 entries × 32 bytes each</td><td><code>ErrTooManyTags</code> / <code>ErrTagTooLong</code></td></tr>
+    <tr><td><code>threat_categories</code></td><td>8 entries</td><td><code>ErrTooManyCategories</code></td></tr>
+    <tr><td><code>related_to</code></td><td>32 entries</td><td><code>ErrTooManyRelatedTo</code></td></tr>
+    <tr><td><code>detection_rules</code></td><td>10 entries (param)</td><td><code>ErrTooManyRules</code></td></tr>
+    <tr><td><code>ttl_seconds</code></td><td>3 600 – 31 536 000</td><td><code>ErrTTLOutOfRange</code></td></tr>
+    <tr><td><code>confidence</code></td><td>0 – 100</td><td><code>ErrInvalidConfidence</code></td></tr>
+    <tr><td>IPv4 TTL</td><td>≤ 7 776 000 (90 days)</td><td><code>ErrIPv4TTLExceeded</code></td></tr>
+    <tr><td>IPv4 confidence</td><td>≥ 60</td><td><code>ErrIPv4LowConfidence</code></td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<hr>
+
+<!-- ── STEP 4 ── -->
+<div class="step-header" id="step4">
+  <div class="step-num">4</div>
+  <h2>Sign the Attester Payload</h2>
+</div>
+
+<p>
+  Every <code>MsgPublishAttestation</code> requires an <code>attester_sig</code>
+  field — a 128-character hex-encoded secp256k1 compact signature. This creates
+  a cryptographic binding between the attester's key and the specific artefact
+  being attested, preventing a transaction relay from substituting a different
+  artefact hash.
+</p>
+
+<div class="phase chain">
+<h3>Signature payload construction</h3>
+<p>From <code>types.BuildAttesterSigPayload</code>:</p>
+<pre><span class="cm">// Canonical payload = SHA-256("{artifact_sha256}|{attester}|{ttl_seconds}")</span>
+payload = SHA256(artifact_sha256 + <span class="str">"|"</span> + attester + <span class="str">"|"</span> + ttl_seconds)</pre>
+
+<pre><span class="cm"># Shell equivalent of BuildAttesterSigPayload</span>
+PAYLOAD_HEX=$(echo -n "${SHA256}|${ATTESTER}|${TTL}" | sha256sum | awk '{print $1}')
+
+<span class="cm"># Sign the payload with the attester's secp256k1 private key</span>
+<span class="cm"># Using the Cosmos SDK keyring (recommended for production)</span>
+ATTESTER_SIG=$(threatattestd keys sign "$PAYLOAD_HEX" \
+  --from attester \
+  --keyring-backend test \
+  --output hex)</pre>
+
+<div class="note">
+  <span class="ic">ℹ</span>
+  <div>
+    <b>Two-layer signature model</b>
+    ThreatAttest uses two independent signatures:
+    <ol style="padding-left:1.2rem;margin-top:.3rem">
+      <li><b>Tx-level signature</b> — the standard Cosmos SDK secp256k1 transaction signature applied by the keyring. This authenticates the sender of the transaction to the ante handler.</li>
+      <li><b>attester_sig</b> — an additional message-level signature binding the attester's key to the specific <code>(artifact_sha256, attester, ttl)</code> triple. This prevents relay substitution attacks where a third party re-broadcasts a valid tx with a different artefact hash.</li>
+    </ol>
+    In the current implementation, the ante handler enforces the tx-level signature cryptographically. <code>attester_sig</code> is validated structurally (128-char hex). Full off-chain signing utilities are in <code>types.BuildAttesterSigPayload</code>.
+  </div>
+</div>
+</div>
+
+<hr>
+
+<!-- ── STEP 5 ── -->
+<div class="step-header" id="step5">
+  <div class="step-num">5</div>
+  <h2>Broadcast MsgPublishAttestation</h2>
+</div>
+
+<div class="phase chain">
+<h3>5a — File-only attestation (no IPFS rules)</h3>
+<pre><span class="cm"># Simplest case: just the file hash + metadata, no detection rules</span>
+threatattestd tx attestation publish \
+  --artifact-sha256 "$SHA256" \
+  --artifact-type   FILE \
+  --severity        HIGH \
+  --confidence      92 \
+  --ttl             604800 \
+  --description     "Ransomware dropper — AES-256 + C2 beacon every 60s" \
+  --tags            "ransomware,dropper,c2,persistence" \
+  --category        "TATST:RANSOMWARE,TATST:DROPPER" \
+  --from            attester \
+  --chain-id        threatattest-1 \
+  --keyring-backend test \
+  --fees            500utatst \
+  --yes \
+  --output          json | tee publish_result.json
+
+ATTEST_ID=$(jq -r '.logs[0].events[] | select(.type=="publish_attestation") | .attributes[] | select(.key=="attestation_id") | .value' publish_result.json 2>/dev/null || \
+            jq -r '.txhash' publish_result.json)</pre>
+
+<h3>5b — Attestation with IPFS detection rules</h3>
+<pre><span class="cm"># With a YARA rule pinned on IPFS (RULE_CID and RULE_SHA256 from Step 2)</span>
+threatattestd tx attestation publish \
+  --artifact-sha256  "$SHA256" \
+  --artifact-type    FILE \
+  --severity         HIGH \
+  --confidence       92 \
+  --ttl              604800 \
+  --description      "Ransomware dropper — AES-256 + C2 beacon" \
+  --tags             "ransomware,dropper,c2" \
+  --category         "TATST:RANSOMWARE,TATST:DROPPER" \
+  --detection-rule   "type=YARA,name=RansomwareDropper,cid=${RULE_CID},sha256=${RULE_SHA256},applies_to=FILE_BYTES,version=1.0.0" \
+  --detection-rule   "type=SIGMA,name=RansomwareSigma,cid=${SIGMA_CID},sha256=${SIGMA_SHA},applies_to=ANY" \
+  --from             attester \
+  --chain-id         threatattest-1 \
+  --keyring-backend  test \
+  --fees             500utatst \
+  --yes</pre>
+
+<h3>5c — URL attestation</h3>
+<pre><span class="cm"># URL attestation: raw_value is required; sha256 must match sha256(normalize(url))</span>
+URL="https://malicious.example.com/payload?stage=2&amp;id=abc"
+NORM="https://malicious.example.com/payload?id=abc&amp;stage=2"   <span class="cm"># sorted query params</span>
+URL_SHA=$(echo -n "$NORM" | sha256sum | awk '{print $1}')
+
+threatattestd tx attestation publish \
+  --artifact-sha256  "$URL_SHA" \
+  --artifact-type    URL \
+  --raw-value        "$URL" \
+  --severity         HIGH \
+  --confidence       88 \
+  --ttl              86400 \
+  --description      "Malware distribution endpoint — stage 2 payload" \
+  --tags             "malware-distribution,c2,stage2" \
+  --category         "TATST:MALWARE,TATST:C2" \
+  --from             attester \
+  --chain-id         threatattest-1 \
+  --fees             500utatst \
+  --yes</pre>
+
+<h3>5d — IPv4 attestation</h3>
+<pre><span class="cm"># IPv4 attestation: sha256 = sha256(dotted-decimal-string)</span>
+IP="203.0.113.42"
+IP_SHA=$(echo -n "$IP" | sha256sum | awk '{print $1}')
+
+threatattestd tx attestation publish \
+  --artifact-sha256  "$IP_SHA" \
+  --artifact-type    IPV4 \
+  --raw-value        "$IP" \
+  --severity         MEDIUM \
+  --confidence       75 \
+  --ttl              172800 \
+  --description      "Observed C2 beacon destination — hourly beacons" \
+  --tags             "c2,beacon,botnet" \
+  --category         "TATST:C2,TATST:BOTNET" \
+  --from             attester \
+  --chain-id         threatattest-1 \
+  --fees             500utatst \
+  --yes</pre>
+</div>
+
+<hr>
+
+<!-- ── STEP 6 ── -->
+<div class="step-header" id="step6">
+  <div class="step-num">6</div>
+  <h2>On-Chain Processing (What the Keeper Does)</h2>
+</div>
+
+<p>
+  When the transaction is included in a block, the
+  <code>MsgServer.PublishAttestation</code> keeper method runs the following
+  sequence:
+</p>
+
+<div class="phase chain">
+<pre><span class="cm">// 1. ValidateBasic — stateless field checks (all 44 error codes)</span>
+<span class="kw">if</span> err := msg.ValidateBasic(); err != nil { <span class="kw">return</span> nil, err }
+
+<span class="cm">// 2. Load module params from KV store</span>
+params, err := s.GetParams(ctx)
+
+<span class="cm">// 3. Reputation gate — attester must have minimum score</span>
+rs, _ := s.repKeeper.GetReputationScore(ctx, msg.Attester)
+<span class="kw">if</span> rs &lt; params.MinReputationToAttest {
+    <span class="kw">return</span> nil, <span class="fn">ErrInsufficientReputation</span>
+}
+
+<span class="cm">// 4. Verify attester_sig — 128-char hex secp256k1 compact sig</span>
+<span class="kw">if</span> err := types.VerifyAttesterSig(msg.Attester, msg.ArtifactSHA256,
+    msg.TTLSeconds, msg.AttesterSig); err != nil {
+    <span class="kw">return</span> nil, <span class="fn">ErrInvalidSignature</span>
+}
+
+<span class="cm">// 5. Derive timestamps from block time (NOT from msg.PublishedAt)</span>
+publishedAt := ctx.BlockTime().Unix()
+expiresAt   := publishedAt + msg.TTLSeconds
+
+<span class="cm">// 6. Compute deterministic attestation ID</span>
+<span class="cm">//    attestation_id = SHA-256("{artifact_sha256}|{attester}|{published_at}")</span>
+attestationID := types.ComputeAttestationID(
+    msg.ArtifactSHA256, msg.Attester, publishedAt)
+
+<span class="cm">// 7. Build and store the AttestationRecord</span>
+rec := types.AttestationRecord{ ... Status: STATUS_ACTIVE ... }
+s.PublishAttestationRecord(ctx, rec)
+
+<span class="cm">// 8. Award +5 reputation to the attester</span>
+s.repKeeper.AddReputation(ctx, msg.Attester, 5)
+
+<span class="cm">// 9. For each DetectionRuleRef, create a VerificationJob in x/ipfsverify</span>
+<span class="cm">//    (handled in abci.go EndBlock after the message is stored)</span></pre>
+</div>
+
+<div class="note">
+  <span class="ic">ℹ</span>
+  <div>
+    <b>published_at is set by block time</b>
+    The <code>published_at</code> timestamp in the stored record is taken from
+    <code>ctx.BlockTime().Unix()</code> — the consensus-agreed block time — not
+    from any field in the message. This prevents timestamp manipulation.
+    The <code>published_at</code> field in the <code>AttestationSpec</code> JSON
+    from <code>attest-file</code> is an estimate used for display only.
+  </div>
+</div>
+
+<hr>
+
+<!-- ── STEP 7 ── -->
+<div class="step-header" id="step7">
+  <div class="step-num">7</div>
+  <h2>IPFS Verification Job Lifecycle</h2>
+</div>
+
+<p>
+  For every <code>DetectionRuleRef</code> in the published attestation, the
+  <code>x/ipfsverify</code> module creates a <code>VerificationJob</code>. This
+  is how the chain confirms that the IPFS content actually matches the declared
+  SHA-256.
+</p>
+
+<div class="phase verify">
+<h3>Job creation (automatic)</h3>
+<pre><span class="cm">// In x/ipfsverify keeper, triggered after PublishAttestation:</span>
+job := types.VerificationJob{
+    JobID:         <span class="fn">SHA256</span>(rule_ipfs_cid + <span class="str">"|"</span> + rule_sha256),
+    AttestationID: attestationID,
+    Attester:      msg.Attester,
+    CID:           rule.RuleIPFSCID,           <span class="cm">// CIDv1 to fetch</span>
+    ExpectedSHA256: rule.RuleSHA256,           <span class="cm">// hash to verify against</span>
+    DeadlineUnix:  ctx.BlockTime().Unix() + (params.VerificationWindowHours * 3600),
+    Status:        JOB_STATUS_PENDING,
+}</pre>
+
+<h3>Validator/relayer reporting</h3>
+<pre><span class="cm"># Each validator daemon fetches the CID from IPFS and hashes the content</span>
+FETCHED_SHA=$(ipfs cat "$RULE_CID" | sha256sum | awk '{print $1}')
+
+<span class="cm"># Compares with the expected hash from the job</span>
+<span class="cm"># Then submits a VerificationReport transaction:</span>
+threatattestd tx ipfsverify submit-report \
+  --job-id    "$JOB_ID" \
+  --cid       "$RULE_CID" \
+  --verified  true \
+  --from      validator \
+  --chain-id  threatattest-1 \
+  --fees      500utatst \
+  --yes</pre>
+
+<h3>Resolution logic</h3>
+<div class="tw">
+<table>
+  <thead><tr><th>Condition</th><th>Outcome</th><th>Effect on DetectionRuleRef</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>≥ <code>min_reports_to_resolve</code> confirming reports</td>
+      <td><span class="badge bg">CONFIRMED</span></td>
+      <td><code>verified = true</code>; validators rewarded <code>reward_per_job</code> utatst</td>
+    </tr>
+    <tr>
+      <td>Majority of validators reject</td>
+      <td><span class="badge br">REJECTED</span></td>
+      <td><code>verified = false</code>; attestation may be disputed</td>
+    </tr>
+    <tr>
+      <td>Deadline elapsed with too few reports</td>
+      <td><span class="badge bo">EXPIRED</span></td>
+      <td><code>verified = false</code>; no penalty</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="ic">ℹ</span>
+  <div>
+    <b>Default parameters</b>
+    <code>min_reports_to_resolve = 3</code>,
+    <code>verification_window_hours = 24</code>,
+    <code>reward_per_job = 1 000 000 utatst</code> (1 TATST).
+    These are governance-adjustable via <code>MsgUpdateIPFSParams</code>.
+  </div>
+</div>
+</div>
+
+<hr>
+
+<!-- ── STEP 8 ── -->
+<div class="step-header" id="step8">
+  <div class="step-num">8</div>
+  <h2>Query the Result</h2>
+</div>
+
+<div class="phase chain">
+<h3>Is this file malicious?</h3>
+<pre>threatattestd query attestation is-malicious \
+  --sha256  "$SHA256" \
+  --node    http://127.0.0.1:26657 \
+  --output  json</pre>
+<pre>{
+  <span class="fld">"is_malicious"</span>:      <span class="kw">true</span>,
+  <span class="fld">"attestation_count"</span>: <span class="num">1</span>,
+  <span class="fld">"highest_severity"</span>:  <span class="str">"HIGH"</span>,
+  <span class="fld">"consensus_score"</span>:   <span class="num">92</span>
+}</pre>
+
+<h3>Full attestation record</h3>
+<pre>threatattestd query attestation get \
+  --sha256  "$SHA256" \
+  --node    http://127.0.0.1:26657 \
+  --output  json | jq .</pre>
+
+<h3>All attestations for this artefact</h3>
+<pre>threatattestd query attestation list-by-artifact \
+  --sha256  "$SHA256" \
+  --limit   20 \
+  --node    http://127.0.0.1:26657 \
+  --output  json</pre>
+
+<h3>Check transaction status</h3>
+<pre>TX_HASH=$(jq -r '.txhash' publish_result.json)
+threatattestd query tx "$TX_HASH" \
+  --node http://127.0.0.1:26657 \
+  --output json | jq '{code:.code, height:.height, gas:.gas_used}'</pre>
+
+<h3>Wait for tx inclusion (async broadcast)</h3>
+<pre>threatattestd wait-tx \
+  --hash    "$TX_HASH" \
+  --node    http://127.0.0.1:26657 \
+  --timeout 30s</pre>
+</div>
+
+<hr>
+
+<!-- ── ARTEFACT TYPE REFERENCE ── -->
+<h2 id="artifacts">Artefact Type Reference</h2>
+
+<div class="tw">
+<table>
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>artifact_sha256 computation</th>
+      <th>raw_value</th>
+      <th>TTL max</th>
+      <th>Confidence min</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge bb">FILE</span></td>
+      <td><code>SHA-256(raw file bytes)</code></td>
+      <td>Optional (filename hint only)</td>
+      <td>365 days</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td><span class="badge bo">URL</span></td>
+      <td><code>SHA-256(normalize(url))</code><br>
+          normalize: lowercase scheme+host, strip default ports, sort query params, strip fragment</td>
+      <td><strong>Required</strong> — original URL string (will be re-normalised by keeper)</td>
+      <td>365 days</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td><span class="badge br">IPV4</span></td>
+      <td><code>SHA-256(dotted-decimal-string)</code><br>
+          e.g. <code>SHA-256("203.0.113.42")</code></td>
+      <td><strong>Required</strong> — dotted-decimal IPv4 string; IANA-reserved ranges blocked</td>
+      <td>90 days</td>
+      <td>60</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<hr>
+
+<!-- ── FULL EXAMPLE ── -->
+<h2 id="full-example">Full End-to-End Shell Example</h2>
+
+<div class="phase chain">
+<pre>#!/usr/bin/env bash
+# =============================================================
+#  ThreatAttest — Full publish + IPFS workflow example
+# =============================================================
+set -euo pipefail
+
+BINARY="./bin/threatattestd"
+CHAIN_ID="threatattest-1"
+KEY="attester"
+NODE="http://127.0.0.1:26657"
+
+# ── 1. Hash the file ─────────────────────────────────────────
+TARGET="malware.bin"
+SHA256=$(sha256sum "$TARGET" | awk '{print $1}')
+echo "[1] SHA-256: $SHA256"
+
+# ── 2. Write and pin a YARA rule ─────────────────────────────
+cat &gt; rule.yar &lt;&lt; 'EOF'
+rule MalwareSample {
+    strings: $s = "malicious.example.com"
+    condition: $s
+}
+EOF
+
+RULE_SHA=$(sha256sum rule.yar | awk '{print $1}')
+RULE_CID=$(ipfs add --cid-version=1 --quieter rule.yar)
+ipfs pin add "$RULE_CID"
+echo "[2] CIDv1: $RULE_CID  SHA256: $RULE_SHA"
+
+# ── 3. Use attest-file to validate params and build spec ─────
+$BINARY attest-file "$TARGET" \
+  --severity    HIGH \
+  --confidence  92 \
+  --ttl         604800 \
+  --description "Malware sample — C2 beacon, file encryption" \
+  --tags        "malware,c2,encryption" \
+  --category    "TATST:MALWARE,TATST:C2" \
+  --output      attestation.json
+
+echo "[3] Spec written to attestation.json"
+cat attestation.json | jq .
+
+# ── 4. Broadcast with IPFS detection rule ────────────────────
+ATTESTER=$($BINARY keys show $KEY --keyring-backend test --address)
+
+TX=$($BINARY tx attestation publish \
+  --artifact-sha256  "$SHA256" \
+  --artifact-type    FILE \
+  --severity         HIGH \
+  --confidence       92 \
+  --ttl              604800 \
+  --description      "Malware sample — C2 beacon, file encryption" \
+  --tags             "malware,c2,encryption" \
+  --category         "TATST:MALWARE,TATST:C2" \
+  --detection-rule   "type=YARA,name=MalwareSample,cid=${RULE_CID},sha256=${RULE_SHA},applies_to=FILE_BYTES,version=1.0.0" \
+  --from             $KEY \
+  --chain-id         $CHAIN_ID \
+  --keyring-backend  test \
+  --fees             500utatst \
+  --yes \
+  --output           json)
+
+TX_HASH=$(echo "$TX" | jq -r '.txhash')
+echo "[4] Tx submitted: $TX_HASH"
+
+# ── 5. Wait for confirmation ──────────────────────────────────
+$BINARY wait-tx --hash "$TX_HASH" --node "$NODE" --timeout 30s
+echo "[5] Confirmed in block"
+
+# ── 6. Query the result ───────────────────────────────────────
+echo "[6] is-malicious query:"
+$BINARY query attestation is-malicious \
+  --sha256 "$SHA256" --node "$NODE" --output json | jq .
+
+echo "[6] Full attestation record:"
+$BINARY query attestation get \
+  --sha256 "$SHA256" --node "$NODE" --output json | jq .
+
+echo "Done. IPFS verification job created — validators will confirm within 24h."</pre>
+</div>
+
+<hr>
+
+<div class="two">
+  <div class="card">
+    <h4>Key points — on-chain</h4>
+    <ul style="padding-left:1.1rem;font-size:.83rem">
+      <li>Only the SHA-256 hash and metadata are stored on-chain</li>
+      <li><code>published_at</code> is set from block time, not the message</li>
+      <li>Attestation ID = SHA-256(sha256|attester|published_at)</li>
+      <li>Reputation score gates publishing and endorsing</li>
+      <li>attester_sig is a 128-char hex secp256k1 compact signature</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Key points — IPFS</h4>
+    <ul style="padding-left:1.1rem;font-size:.83rem">
+      <li>Always use <code>--cid-version=1</code> — CIDv0 (Qm…) is rejected</li>
+      <li>Include both the CIDv1 <em>and</em> the SHA-256 in DetectionRuleRef</li>
+      <li>Pin to ≥1 persistent node; use a pinning service for redundancy</li>
+      <li>Validators fetch the CID and verify the hash within 24 hours</li>
+      <li>Up to 10 detection rules per attestation</li>
+    </ul>
+  </div>
+</div>
+
+<p style="color:var(--text2);font-size:.75rem;text-align:center;margin-top:2rem">
+  ThreatAttest v0.1.0 · 
+  <a href="specification.html">Full Specification</a> · 
+  <a href="MANPAGE.md">CLI Man Page</a> · 
+  <a href="README.md">README</a>
+</p>
+
+</div><!-- /page -->
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest Shield</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:       #0f172a;
+    --surface:  #1e293b;
+    --border:   #334155;
+    --text:     #f1f5f9;
+    --muted:    #94a3b8;
+    --accent:   #3b82f6;
+    --green:    #22c55e;
+    --yellow:   #f59e0b;
+    --orange:   #f97316;
+    --red:      #ef4444;
+    --critical: #dc2626;
+  }
+  body {
+    width: 380px; min-height: 200px;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, system-ui, 'Segoe UI', sans-serif;
+    font-size: 13px; line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .header-logo { font-size: 22px; }
+  .header-title { font-weight: 700; font-size: 15px; letter-spacing: 0.3px; }
+  .header-sub { font-size: 11px; color: var(--muted); }
+  .header-actions { margin-left: auto; display: flex; gap: 6px; }
+  .icon-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 6px;
+    padding: 4px 8px; cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
+  }
+  .icon-btn:hover { background: var(--border); color: var(--text); }
+
+  /* Node status bar */
+  .node-bar {
+    background: #0d1b2a; border-bottom: 1px solid var(--border);
+    padding: 5px 14px;
+    display: flex; align-items: center; gap: 6px; font-size: 11px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+  .status-dot.offline { background: #6b7280; animation: none; }
+  .status-dot.warn    { background: var(--yellow); }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  /* Current page info */
+  .page-section {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-url {
+    font-size: 11px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 340px;
+  }
+  .page-status {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  }
+  .page-status-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 4px; letter-spacing: 0.8px;
+  }
+  .badge-clean    { background: #14532d; color: #86efac; }
+  .badge-info     { background: #1e3a5f; color: #93c5fd; }
+  .badge-low      { background: #14532d; color: #86efac; }
+  .badge-medium   { background: #78350f; color: #fcd34d; }
+  .badge-high     { background: #7c2d12; color: #fdba74; }
+  .badge-critical { background: #7f1d1d; color: #fca5a5; }
+  .badge-unknown  { background: #1e293b; color: #94a3b8; }
+
+  /* Threats list */
+  .threats-header {
+    padding: 8px 14px 4px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  .threats-list { max-height: 200px; overflow-y: auto; }
+  .threats-list::-webkit-scrollbar { width: 4px; }
+  .threats-list::-webkit-scrollbar-track { background: var(--bg); }
+  .threats-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .threat-item {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 10px;
+    cursor: pointer; transition: background 0.1s;
+  }
+  .threat-item:hover { background: var(--surface); }
+  .threat-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .threat-info { flex: 1; min-width: 0; }
+  .threat-type { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+  .threat-subject {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 240px;
+  }
+  .threat-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .threat-sev {
+    font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px;
+    flex-shrink: 0; margin-top: 3px; letter-spacing: 0.5px;
+  }
+
+  .no-threats {
+    padding: 24px 14px; text-align: center; color: var(--muted);
+  }
+  .no-threats .big { font-size: 32px; margin-bottom: 8px; }
+
+  /* Quick actions */
+  .actions {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .action-btn {
+    flex: 1; min-width: 100px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px;
+    padding: 7px 10px; cursor: pointer; font-size: 12px; font-weight: 600;
+    text-align: center; transition: background 0.15s;
+  }
+  .action-btn:hover { background: var(--border); }
+  .action-btn.danger { border-color: var(--red); color: var(--red); }
+  .action-btn.danger:hover { background: #7f1d1d; color: #fca5a5; border-color: #fca5a5; }
+  .action-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .action-btn.primary:hover { background: #2563eb; }
+
+  /* Stats row */
+  .stats-row {
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 16px; font-size: 11px; color: var(--muted);
+  }
+  .stat-item strong { color: var(--text); }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 4px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollable container */
+  .scroll-container { max-height: 320px; overflow-y: auto; }
+
+  /* ── DNS Identity Badge ─────────────────────────────────────────── */
+  .identity-section {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .identity-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border-radius: 6px;
+    padding: 7px 10px; border: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .identity-badge.badge-identity-active   { border-color: #22c55e; }
+  .identity-badge.badge-identity-active.tier-3 { border-color: #f59e0b; }
+  .identity-badge.badge-identity-pending  { border-color: #f59e0b; }
+  .identity-badge.badge-identity-expired  { border-color: #f97316; }
+  .identity-badge.badge-identity-revoked  { border-color: #ef4444; }
+  .identity-badge.badge-identity-dns-removed { border-color: #ef4444; }
+  .identity-badge.badge-no-identity       { border-color: var(--border); opacity: 0.6; }
+
+  .identity-icon { font-size: 18px; flex-shrink: 0; }
+  .identity-info { flex: 1; min-width: 0; }
+  .identity-label {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .identity-meta { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .identity-tier {
+    font-size: 10px; font-weight: 700; padding: 2px 6px;
+    border-radius: 3px; letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .tier-0 { background: #1e293b; color: #94a3b8; }
+  .tier-1 { background: #1c2a3a; color: #60a5fa; }
+  .tier-2 { background: #14532d; color: #86efac; }
+  .tier-3 { background: #451a03; color: #fcd34d; }
+
+  .identity-section-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted); margin-bottom: 5px;
+  }
+  .identity-details-toggle {
+    font-size: 10px; color: var(--accent); cursor: pointer;
+    background: none; border: none; padding: 0; margin-top: 4px;
+    text-decoration: underline;
+  }
+  .identity-details {
+    display: none; margin-top: 6px;
+    background: #0d1b2a; border-radius: 4px; padding: 6px 8px;
+    font-size: 10px; color: var(--muted); line-height: 1.7;
+  }
+  .identity-details.visible { display: block; }
+  .identity-detail-row { display: flex; gap: 6px; }
+  .identity-detail-key { color: var(--text); font-weight: 600; min-width: 80px; }
+
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">🛡️</div>
+  <div>
+    <div class="header-title">ThreatAttest Shield</div>
+    <div class="header-sub">Blockchain Threat Intelligence</div>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="btn-recheck" title="Re-check current page">🔄</button>
+    <button class="icon-btn" id="btn-options" title="Settings">⚙️</button>
+  </div>
+</div>
+
+<!-- Node status bar -->
+<div class="node-bar">
+  <div class="status-dot" id="node-dot"></div>
+  <span id="node-status-text">Checking node…</span>
+  <span style="margin-left:auto; font-size:10px;" id="node-url-short"></span>
+</div>
+
+<!-- Current page -->
+<div class="page-section">
+  <div class="page-url" id="current-url">Loading…</div>
+  <div class="page-status">
+    <div class="page-status-badge badge-unknown" id="page-status-badge">CHECKING…</div>
+    <span id="page-status-text" style="font-size:11px; color:var(--muted);">Querying chain…</span>
+  </div>
+</div>
+
+<!-- Threats list -->
+
+<div class="identity-section" id="identity-section" style="display:none">
+  <div class="identity-section-label">🌐 Attester Identity</div>
+  <div class="identity-badge badge-no-identity" id="identity-badge" title="">
+    <div class="identity-icon" id="identity-icon">❔</div>
+    <div class="identity-info">
+      <div class="identity-label" id="identity-label">No Identity</div>
+      <div class="identity-meta" id="identity-meta">No DNS identity registered</div>
+    </div>
+    <div class="identity-tier tier-0" id="identity-tier">Anon</div>
+  </div>
+  <button class="identity-details-toggle" id="identity-details-toggle" style="display:none">
+    Show details ▼
+  </button>
+  <div class="identity-details" id="identity-details">
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Domain:</span>
+      <span id="id-detail-domain">—</span>
+    </div>
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Address:</span>
+      <span id="id-detail-addr">—</span>
+    </div>
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Selector:</span>
+      <span id="id-detail-selector">—</span>
+    </div>
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Trust Score:</span>
+      <span id="id-detail-score">—</span>
+    </div>
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Expires:</span>
+      <span id="id-detail-expires">—</span>
+    </div>
+    <div class="identity-detail-row">
+      <span class="identity-detail-key">Attestation:</span>
+      <span id="id-detail-attestation">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="threats-header">
+  <span>Threats on this page</span>
+  <span id="threat-count" style="color:var(--muted);">0</span>
+</div>
+<div class="threats-list" id="threats-list">
+  <div class="no-threats">
+    <div class="big">✅</div>
+    <div>No threats detected</div>
+    <div style="font-size:11px;margin-top:4px;">on this page</div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-item">Session checks: <strong id="stat-checks">0</strong></div>
+  <div class="stat-item">Threats found: <strong id="stat-threats">0</strong></div>
+  <div class="stat-item">Blocked: <strong id="stat-blocked">0</strong></div>
+</div>
+
+<!-- Actions -->
+<div class="actions">
+  <button class="action-btn primary" id="btn-check-manual">🔍 Check URL/Hash</button>
+  <button class="action-btn danger"  id="btn-clear">🗑 Clear Session</button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

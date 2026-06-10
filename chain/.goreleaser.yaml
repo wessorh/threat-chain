@@ -1,0 +1,219 @@
+# Copyright (c) 2026 by Support Intelligence, Inc. All rights reserved.
+
+# =============================================================================
+# .goreleaser.yaml — GoReleaser configuration for ThreatAttest Chain
+# =============================================================================
+#
+# Builds multi-arch binaries, creates a GitHub Release with checksums,
+# and pushes a multi-arch Docker image to ghcr.io.
+#
+# Local snapshot (no publish):
+#   goreleaser release --snapshot --clean
+#
+# Full release (requires GITHUB_TOKEN):
+#   goreleaser release --clean
+# =============================================================================
+
+version: 2
+
+# ─── Project metadata ────────────────────────────────────────────────────────
+project_name: threatattestd
+
+# ─── Before hooks ────────────────────────────────────────────────────────────
+before:
+  hooks:
+    - go mod verify
+    - go mod tidy
+
+# ─── Build targets ───────────────────────────────────────────────────────────
+builds:
+  - id:      threatattestd
+    binary:  threatattestd
+    main:    ./cmd/threatattestd
+
+    env:
+      - CGO_ENABLED=0   # static by default; override per-target below
+
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Exclude windows/arm64 (no demand yet)
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+    # Per-target CGO flag: CGO required on Linux for rocksdb support
+    # but disabled for cross-compiles to keep CI simple.
+    overrides:
+      - goos: linux
+        goarch: amd64
+        env:
+          - CGO_ENABLED=1
+
+    ldflags:
+      - >-
+        -X github.com/cosmos/cosmos-sdk/version.Name=threatattestd
+        -X github.com/cosmos/cosmos-sdk/version.AppName=threatattestd
+        -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}}
+        -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}}
+        -X github.com/cosmos/cosmos-sdk/version.BuildTags={{.Env.BUILD_TAGS}}
+
+    # Strip debug symbols for release binaries
+    flags:
+      - -mod=readonly
+      - -trimpath
+
+# ─── Archives ────────────────────────────────────────────────────────────────
+archives:
+  - id:     threatattest
+    builds: [threatattestd]
+
+    # Name template: threatattestd-v0.1.0-linux-amd64.tar.gz
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Version }}-
+      {{- .Os }}-
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+    format: tar.gz
+    format_overrides:
+      - goos:   windows
+        format: zip
+
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+# ─── Checksums ───────────────────────────────────────────────────────────────
+checksum:
+  name_template: checksums.txt
+  algorithm:     sha256
+
+# ─── Changelog ───────────────────────────────────────────────────────────────
+changelog:
+  sort: asc
+  use:  github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge remote-tracking branch"
+      - "Merge branch"
+  groups:
+    - title: "New Features"
+      regexp: "^feat"
+      order:  0
+    - title: "Bug Fixes"
+      regexp: "^fix"
+      order:  1
+    - title: "Performance"
+      regexp: "^perf"
+      order:  2
+    - title: "Security"
+      regexp: "^sec"
+      order:  3
+    - title: Other
+      order: 999
+
+# ─── GitHub Release ──────────────────────────────────────────────────────────
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name:  chain
+
+  draft:      false
+  prerelease: auto   # mark as pre-release if version contains -rc, -beta, etc.
+
+  header: |
+    ## ThreatAttest Chain {{ .Tag }}
+
+    Threat intelligence blockchain node release.
+
+  footer: |
+    ### Docker
+
+    ```bash
+    docker pull ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Tag }}
+    ```
+
+    ### Verify checksums
+
+    ```bash
+    sha256sum --check checksums.txt
+    ```
+
+    ---
+    **Full Changelog**: https://github.com/{{ .Env.GITHUB_REPOSITORY }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+  extra_files:
+    - glob: ./dist/threatattestd-*-linux-amd64.tar.gz
+    - glob: ./dist/checksums.txt
+
+# ─── Docker images ────────────────────────────────────────────────────────────
+dockers:
+  - id:         threatattestd-amd64
+    goos:       linux
+    goarch:     amd64
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:latest-amd64"
+    dockerfile: Dockerfile
+    use:        buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=GIT_VERSION={{ .Version }}"
+      - "--build-arg=GIT_COMMIT={{ .Commit }}"
+      - "--build-arg=BUILD_DATE={{ .Date }}"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+
+  - id:         threatattestd-arm64
+    goos:       linux
+    goarch:     arm64
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:latest-arm64"
+    dockerfile: Dockerfile
+    use:        buildx
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=GIT_VERSION={{ .Version }}"
+      - "--build-arg=GIT_COMMIT={{ .Commit }}"
+      - "--build-arg=BUILD_DATE={{ .Date }}"
+
+# ─── Docker multi-arch manifests ─────────────────────────────────────────────
+docker_manifests:
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:{{ .Version }}-arm64"
+
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:latest"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:latest-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/threatattestd:latest-arm64"
+
+# ─── Snapshot config ─────────────────────────────────────────────────────────
+snapshot:
+  version_template: "{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}"
+
+# ─── Announce (optional) ─────────────────────────────────────────────────────
+# Uncomment and configure to post release announcements:
+# announce:
+#   slack:
+#     enabled: true
+#     message_template: "ThreatAttest {{ .Tag }} released! {{ .ReleaseURL }}"
+#     channel: "#releases"

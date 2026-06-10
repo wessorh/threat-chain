@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest — Threat Detected</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0f172a; color: #f1f5f9;
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.5;
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: #1e293b; border-radius: 16px;
+    border: 1px solid #334155;
+    max-width: 500px; width: 100%;
+    box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+    overflow: hidden;
+    animation: appear 0.25s ease-out;
+  }
+  @keyframes appear {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* Severity header strip */
+  .card-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #334155;
+    display: flex; align-items: flex-start; gap: 16px;
+  }
+  .sev-icon { font-size: 44px; flex-shrink: 0; }
+  .sev-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block; margin-bottom: 6px;
+  }
+  .card-title { font-size: 18px; font-weight: 700; line-height: 1.3; }
+  .card-subtitle { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+  /* Info grid */
+  .info-grid {
+    padding: 16px 24px;
+    display: grid; gap: 0;
+    border-bottom: 1px solid #334155;
+  }
+  .info-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 6px 0; border-bottom: 1px solid #1e293b; gap: 12px;
+    font-size: 13px;
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label { color: #64748b; white-space: nowrap; flex-shrink: 0; }
+  .info-value { color: #e2e8f0; text-align: right; word-break: break-all; }
+
+  /* Trust score bar */
+  .trust-bar-wrap {
+    padding: 14px 24px;
+    border-bottom: 1px solid #334155;
+  }
+  .trust-bar-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: #94a3b8; margin-bottom: 6px;
+  }
+  .trust-bar-track {
+    height: 8px; background: #334155; border-radius: 4px; overflow: hidden;
+  }
+  .trust-bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.5s ease;
+  }
+
+  /* Category tags */
+  .tag-row {
+    padding: 12px 24px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    border-bottom: 1px solid #334155;
+  }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 2px 8px;
+    background: #0f172a; border: 1px solid #334155; border-radius: 4px;
+    color: #94a3b8;
+  }
+
+  /* Description */
+  .desc-block {
+    padding: 12px 24px;
+    font-size: 12px; color: #94a3b8; font-style: italic;
+    border-bottom: 1px solid #334155;
+    max-height: 60px; overflow: hidden;
+  }
+
+  /* Decision buttons */
+  .actions {
+    padding: 16px 24px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .btn {
+    width: 100%; padding: 12px 20px;
+    border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all 0.15s;
+  }
+  .btn-block {
+    background: #dc2626; color: #fff;
+  }
+  .btn-block:hover { background: #b91c1c; transform: translateY(-1px); }
+  .btn-allow {
+    background: #1d4ed8; color: #fff;
+  }
+  .btn-allow:hover { background: #1e40af; }
+  .btn-snooze {
+    background: #374151; color: #d1d5db;
+  }
+  .btn-snooze:hover { background: #4b5563; }
+  .btn-whitelist {
+    background: transparent; color: #64748b;
+    border: 1px solid #334155; font-size: 12px; padding: 8px 20px;
+  }
+  .btn-whitelist:hover { background: #1e293b; color: #94a3b8; }
+
+  /* Timer */
+  .timer-bar {
+    height: 3px; background: #334155;
+    animation: shrink 15s linear forwards;
+  }
+  @keyframes shrink { from { width: 100%; } to { width: 0; } }
+
+  .attester-info {
+    padding: 0 24px 12px;
+    font-size: 11px; color: #475569;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <!-- Auto-close timer bar -->
+  <div class="timer-bar" id="timer-bar"></div>
+
+  <!-- Header -->
+  <div class="card-header" id="card-header">
+    <div class="sev-icon" id="sev-icon">⚠️</div>
+    <div>
+      <div class="sev-label" id="sev-label">HIGH</div>
+      <div class="card-title" id="card-title">Threat Detected</div>
+      <div class="card-subtitle" id="card-subtitle">This item is attested malicious on the ThreatAttest blockchain.</div>
+    </div>
+  </div>
+
+  <!-- Info rows -->
+  <div class="info-grid" id="info-grid"></div>
+
+  <!-- Trust score bar -->
+  <div class="trust-bar-wrap" id="trust-bar-wrap">
+    <div class="trust-bar-label">
+      <span>Trust Score (chain confidence)</span>
+      <span id="trust-score-val">0 / 1000</span>
+    </div>
+    <div class="trust-bar-track">
+      <div class="trust-bar-fill" id="trust-bar-fill" style="width:0%;background:#ef4444;"></div>
+    </div>
+  </div>
+
+  <!-- Categories -->
+  <div class="tag-row" id="tag-row"></div>
+
+  <!-- Description -->
+  <div class="desc-block" id="desc-block" style="display:none;"></div>
+
+  <!-- Attester -->
+  <div class="attester-info" id="attester-info"></div>
+
+  <!-- Action buttons -->
+  <div class="actions">
+    <button class="btn btn-block"     id="btn-block">🚫 Block & Delete</button>
+    <button class="btn btn-allow"     id="btn-allow">✅ Allow This Time</button>
+    <button class="btn btn-snooze"    id="btn-snooze">⏱ Snooze 30 min</button>
+    <button class="btn btn-whitelist" id="btn-whitelist">📋 Always Allow (add to whitelist)</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Parse URL params
+// ============================================================
+const params = new URLSearchParams(window.location.search);
+const TYPE       = params.get("type")       || "FILE";
+const DL_ID      = parseInt(params.get("id") || "0");
+const FILENAME   = params.get("filename")   || "unknown file";
+const SEVERITY   = parseInt(params.get("severity") || "4");
+const TRUST      = parseInt(params.get("trustScore") || "0");
+const CATEGORIES = JSON.parse(decodeURIComponent(params.get("categories") || "[]"));
+const ATTESTER   = decodeURIComponent(params.get("attester") || "");
+const DESCRIPTION = decodeURIComponent(params.get("description") || "");
+const ATTEST_ID  = decodeURIComponent(params.get("attestId") || "");
+
+const SEV_LABELS = ["UNSPECIFIED","INFO","LOW","MEDIUM","HIGH","CRITICAL"];
+const SEV_EMOJI  = ["❓","ℹ️","🟢","🟡","🟠","🔴"];
+const SEV_COLORS = ["#6b7280","#3b82f6","#22c55e","#f59e0b","#f97316","#ef4444"];
+const SEV_BG     = ["#1e293b","#1e3a5f","#14532d","#78350f","#7c2d12","#7f1d1d"];
+
+const sevLabel = SEV_LABELS[SEVERITY] || "HIGH";
+const sevEmoji = SEV_EMOJI[SEVERITY]  || "⚠️";
+const sevColor = SEV_COLORS[SEVERITY] || "#ef4444";
+const sevBg    = SEV_BG[SEVERITY]     || "#7f1d1d";
+
+// ============================================================
+// Render header
+// ============================================================
+document.getElementById("sev-icon").textContent = sevEmoji;
+document.getElementById("sev-label").textContent = sevLabel;
+document.getElementById("sev-label").style.background = sevBg;
+document.getElementById("sev-label").style.color = sevColor;
+document.getElementById("card-header").style.background = sevBg + "44";
+
+if (TYPE === "DOWNLOAD") {
+  document.getElementById("card-title").textContent = "Dangerous Download Blocked";
+  document.getElementById("card-subtitle").textContent =
+    "This file is attested as malicious on the ThreatAttest blockchain.";
+} else if (TYPE === "URL" || TYPE === "DOMAIN") {
+  document.getElementById("card-title").textContent = "Malicious Website Detected";
+  document.getElementById("card-subtitle").textContent =
+    "This domain/URL is attested as a threat on the ThreatAttest blockchain.";
+} else if (TYPE === "IPV4") {
+  document.getElementById("card-title").textContent = "Malicious IP Address Detected";
+  document.getElementById("card-subtitle").textContent =
+    "This IP address is attested as malicious on the ThreatAttest blockchain.";
+}
+
+// ============================================================
+// Info rows
+// ============================================================
+const grid = document.getElementById("info-grid");
+function addRow(label, value, valueColor) {
+  const row = document.createElement("div");
+  row.className = "info-row";
+  row.innerHTML = `
+    <span class="info-label">${label}</span>
+    <span class="info-value" ${valueColor ? `style="color:${valueColor};font-weight:700;"` : ""}>${value}</span>
+  `;
+  grid.appendChild(row);
+}
+
+if (TYPE === "DOWNLOAD") {
+  addRow("File", FILENAME);
+} else {
+  addRow("Target", FILENAME);
+}
+addRow("Severity", sevLabel, sevColor);
+addRow("Attestation ID", ATTEST_ID ? ATTEST_ID.slice(0,20)+"…" : "—");
+addRow("Attester", ATTESTER ? ATTESTER.slice(0,16)+"…"+ATTESTER.slice(-6) : "—");
+
+// ============================================================
+// Trust score bar
+// ============================================================
+document.getElementById("trust-score-val").textContent = `${TRUST} / 1000`;
+const pct = Math.min(100, Math.round(TRUST / 10));
+document.getElementById("trust-bar-fill").style.width = `${pct}%`;
+document.getElementById("trust-bar-fill").style.background =
+  TRUST >= 800 ? "#ef4444" : TRUST >= 500 ? "#f97316" : TRUST >= 300 ? "#f59e0b" : "#22c55e";
+
+// ============================================================
+// Category tags
+// ============================================================
+const tagRow = document.getElementById("tag-row");
+if (CATEGORIES && CATEGORIES.length > 0) {
+  CATEGORIES.forEach(cat => {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = cat;
+    tagRow.appendChild(tag);
+  });
+} else {
+  tagRow.style.display = "none";
+}
+
+// ============================================================
+// Description
+// ============================================================
+if (DESCRIPTION) {
+  const desc = document.getElementById("desc-block");
+  desc.textContent = `"${DESCRIPTION}"`;
+  desc.style.display = "block";
+}
+
+// ============================================================
+// Attester info
+// ============================================================
+if (ATTESTER) {
+  document.getElementById("attester-info").textContent =
+    `Reported by attester: ${ATTESTER}`;
+}
+
+// ============================================================
+// Countdown auto-allow (15 seconds)
+// ============================================================
+let countdown = 15;
+const timer = setInterval(() => {
+  countdown--;
+  if (countdown <= 0) {
+    clearInterval(timer);
+    handleDecision("ALLOW_ONCE");
+  }
+}, 1000);
+
+// ============================================================
+// Buttons
+// ============================================================
+document.getElementById("btn-block").addEventListener("click", () => {
+  clearInterval(timer);
+  handleDecision("BLOCK");
+});
+document.getElementById("btn-allow").addEventListener("click", () => {
+  clearInterval(timer);
+  handleDecision("ALLOW_ONCE");
+});
+document.getElementById("btn-snooze").addEventListener("click", () => {
+  clearInterval(timer);
+  handleDecision("SNOOZE");
+});
+document.getElementById("btn-whitelist").addEventListener("click", () => {
+  clearInterval(timer);
+  handleDecision("ALLOW_ALWAYS");
+});
+
+function handleDecision(decision) {
+  chrome.runtime.sendMessage({
+    type: "THREAT_DECISION",
+    decision,
+    subject: FILENAME,
+    subjectType: TYPE,
+    downloadId: DL_ID || null,
+    attestId: ATTEST_ID,
+  });
+  window.close();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "ThreatAttest Shield",
+  "version": "1.0.0",
+  "description": "Real-time threat intelligence from the ThreatAttest blockchain. Checks every downloaded file, browsed domain, and IP address against on-chain attestations.",
+  "author": "ThreatAttest",
+  "permissions": [
+    "downloads",
+    "webRequest",
+    "storage",
+    "notifications",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "ThreatAttest Shield"
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "threat-popup.html"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

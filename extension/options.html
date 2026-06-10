@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest Shield — Settings</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #162032;
+    --border: #334155; --text: #f1f5f9; --muted: #94a3b8;
+    --accent: #3b82f6; --green: #22c55e; --red: #ef4444;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.5;
+    min-height: 100vh;
+  }
+  .layout { max-width: 720px; margin: 0 auto; padding: 32px 20px; }
+
+  /* Header */
+  .page-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 32px;
+  }
+  .page-header-icon { font-size: 36px; }
+  .page-header h1 { font-size: 22px; font-weight: 700; }
+  .page-header p  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .node-indicator {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .dot.offline { background: #6b7280; }
+
+  /* Section card */
+  .section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; margin-bottom: 20px; overflow: hidden;
+  }
+  .section-title {
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 13px; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-body { padding: 6px 0; }
+
+  /* Setting row */
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; border-bottom: 1px solid #1e293b; gap: 16px;
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-info { flex: 1; }
+  .setting-label { font-weight: 600; font-size: 14px; }
+  .setting-desc  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .setting-control { flex-shrink: 0; }
+
+  /* Toggle switch */
+  .toggle {
+    position: relative; display: inline-block; width: 44px; height: 24px;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; border-radius: 12px;
+    background: #334155; cursor: pointer; transition: 0.2s;
+  }
+  .toggle-slider::before {
+    content: ""; position: absolute;
+    height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background: #94a3b8; border-radius: 50%; transition: 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before {
+    transform: translateX(20px); background: #fff;
+  }
+
+  /* Text input */
+  .text-input {
+    background: #0f172a; border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; outline: none; width: 100%;
+    transition: border-color 0.15s;
+  }
+  .text-input:focus { border-color: var(--accent); }
+  .input-group { display: flex; gap: 8px; align-items: center; }
+  .input-group .text-input { flex: 1; }
+
+  /* Select */
+  .select-input {
+    background: #0f172a; border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 8px 12px;
+    font-size: 13px; outline: none; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .select-input:focus { border-color: var(--accent); }
+
+  /* Textarea for whitelist */
+  .textarea-input {
+    background: #0f172a; border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 10px 12px;
+    font-size: 12px; outline: none; width: 100%;
+    font-family: "SF Mono", "Fira Code", monospace; line-height: 1.6;
+    resize: vertical; min-height: 80px;
+    transition: border-color 0.15s;
+  }
+  .textarea-input:focus { border-color: var(--accent); }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 16px; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-secondary:hover { background: #475569; }
+  .btn-danger { background: #7f1d1d; color: #fca5a5; border: 1px solid #ef444444; }
+  .btn-danger:hover { background: #991b1b; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+  /* Save bar */
+  .save-bar {
+    position: sticky; bottom: 0; background: var(--surface);
+    border-top: 1px solid var(--border); padding: 14px 20px;
+    display: flex; align-items: center; gap: 12px; margin-top: 24px;
+  }
+  .save-status { font-size: 12px; color: var(--green); }
+
+  /* Test result */
+  .test-result {
+    font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 8px;
+  }
+  .test-ok  { background: #14532d22; color: #86efac; border: 1px solid #22c55e44; }
+  .test-err { background: #7f1d1d22; color: #fca5a5; border: 1px solid #ef444444; }
+
+  /* Full-width setting row */
+  .setting-row.full { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .setting-row.full .setting-control { width: 100%; }
+
+  /* About section */
+  .about-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 20px;
+  }
+  .about-item { font-size: 12px; }
+  .about-item .label { color: var(--muted); margin-bottom: 2px; }
+  .about-item .value { color: var(--text); font-weight: 600; }
+  code {
+    background: #0f172a; border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 3px; font-size: 11px;
+    font-family: "SF Mono", monospace;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div class="page-header-icon">🛡️</div>
+    <div>
+      <h1>ThreatAttest Shield</h1>
+      <p>Browser extension settings</p>
+    </div>
+    <div class="node-indicator">
+      <div class="dot" id="header-dot"></div>
+      <span id="header-node-status">Checking…</span>
+    </div>
+  </div>
+
+  <!-- Node Connection -->
+  <div class="section">
+    <div class="section-title">🌐 Node Connection</div>
+    <div class="section-body">
+      <div class="setting-row full">
+        <div class="setting-info">
+          <div class="setting-label">ThreatAttest Node URL</div>
+          <div class="setting-desc">
+            REST/LCD endpoint of your ThreatAttest Cosmos node.
+            Default: <code>http://localhost:1317</code>
+          </div>
+        </div>
+        <div class="setting-control">
+          <div class="input-group">
+            <input type="text" class="text-input" id="nodeURL" placeholder="http://localhost:1317">
+            <button class="btn btn-secondary btn-sm" id="btn-test-node">Test</button>
+          </div>
+          <div id="node-test-result"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Protection Settings -->
+  <div class="section">
+    <div class="section-title">🔒 Protection</div>
+    <div class="section-body">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Check Downloads</div>
+          <div class="setting-desc">Hash every completed download and query the chain for file attestations.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="checkDownloads">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Check Domains & URLs</div>
+          <div class="setting-desc">Query the chain for every domain/URL you navigate to.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="checkDomains">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Check IP Addresses</div>
+          <div class="setting-desc">Extract and check all IP addresses found in page resources.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="checkIPs">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto-Block Settings -->
+  <div class="section">
+    <div class="section-title">🚫 Auto-Block Rules</div>
+    <div class="section-body">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Auto-Block CRITICAL Threats</div>
+          <div class="setting-desc">Automatically cancel downloads and block navigation for CRITICAL severity attestations without asking.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="blockOnCritical">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Auto-Block HIGH Threats</div>
+          <div class="setting-desc">Automatically block HIGH severity threats without showing a popup.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="blockOnHigh">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Minimum Alert Severity</div>
+          <div class="setting-desc">Only show popups/overlays for threats at or above this severity.</div>
+        </div>
+        <div class="setting-control">
+          <select class="select-input" id="minSeverityAlert">
+            <option value="0">All (including INFO)</option>
+            <option value="2">LOW and above</option>
+            <option value="3">MEDIUM and above</option>
+            <option value="4">HIGH and above</option>
+            <option value="5">CRITICAL only</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="section">
+    <div class="section-title">🔔 Notifications</div>
+    <div class="section-body">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Show Desktop Notifications</div>
+          <div class="setting-desc">Display system notifications for detected threats.</div>
+        </div>
+        <div class="setting-control">
+          <label class="toggle">
+            <input type="checkbox" id="showNotifications">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Whitelist -->
+  <div class="section">
+    <div class="section-title">✅ Whitelist</div>
+    <div class="section-body">
+      <div class="setting-row full">
+        <div class="setting-info">
+          <div class="setting-label">Whitelisted Domains</div>
+          <div class="setting-desc">One domain per line. These will never be checked or blocked (e.g. <code>example.com</code>).</div>
+        </div>
+        <div class="setting-control">
+          <textarea class="textarea-input" id="whitelistDomains" placeholder="example.com&#10;trusted-site.org"></textarea>
+        </div>
+      </div>
+      <div class="setting-row full">
+        <div class="setting-info">
+          <div class="setting-label">Whitelisted IP Addresses</div>
+          <div class="setting-desc">One IPv4 per line. These IPs will never be flagged.</div>
+        </div>
+        <div class="setting-control">
+          <textarea class="textarea-input" id="whitelistIPs" placeholder="1.2.3.4&#10;5.6.7.8"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Danger zone -->
+  <div class="section">
+    <div class="section-title" style="color:#f87171;">⚠️ Reset</div>
+    <div class="section-body">
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Reset All Settings</div>
+          <div class="setting-desc">Restore all settings to defaults and clear the query cache.</div>
+        </div>
+        <div class="setting-control">
+          <button class="btn btn-danger btn-sm" id="btn-reset">Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="section">
+    <div class="section-title">ℹ️ About</div>
+    <div class="about-grid">
+      <div class="about-item"><div class="label">Extension</div><div class="value">ThreatAttest Shield</div></div>
+      <div class="about-item"><div class="label">Version</div><div class="value">1.0.0</div></div>
+      <div class="about-item"><div class="label">Chain</div><div class="value">ThreatAttest (Cosmos SDK v0.50.9)</div></div>
+      <div class="about-item"><div class="label">Token</div><div class="value">TATST (utatst)</div></div>
+      <div class="about-item"><div class="label">Supported Types</div><div class="value">FILE, URL, IPv4</div></div>
+      <div class="about-item"><div class="label">Manifest</div><div class="value">MV3 (Chrome/Brave)</div></div>
+    </div>
+  </div>
+
+  <!-- Save bar -->
+  <div class="save-bar">
+    <button class="btn btn-primary" id="btn-save">💾 Save Settings</button>
+    <button class="btn btn-secondary" id="btn-cancel">Cancel</button>
+    <span class="save-status" id="save-status" style="display:none;">✓ Saved!</span>
+  </div>
+</div>
+
+<script>
+const DEFAULTS = {
+  nodeURL:           "http://localhost:1317",
+  checkDownloads:    true,
+  checkDomains:      true,
+  checkIPs:          true,
+  blockOnCritical:   true,
+  blockOnHigh:       false,
+  minSeverityAlert:  2,
+  showNotifications: true,
+  whitelistDomains:  [],
+  whitelistIPs:      [],
+};
+
+let currentSettings = { ...DEFAULTS };
+
+// ============================================================
+// Load settings from background
+// ============================================================
+async function loadSettings() {
+  try {
+    const res = await chrome.runtime.sendMessage({ type: "GET_SETTINGS" });
+    currentSettings = { ...DEFAULTS, ...(res.settings || {}) };
+  } catch {
+    currentSettings = { ...DEFAULTS };
+  }
+  populateForm();
+  await checkNodeStatus();
+}
+
+function populateForm() {
+  document.getElementById("nodeURL").value           = currentSettings.nodeURL || DEFAULTS.nodeURL;
+  document.getElementById("checkDownloads").checked  = !!currentSettings.checkDownloads;
+  document.getElementById("checkDomains").checked    = !!currentSettings.checkDomains;
+  document.getElementById("checkIPs").checked        = !!currentSettings.checkIPs;
+  document.getElementById("blockOnCritical").checked = !!currentSettings.blockOnCritical;
+  document.getElementById("blockOnHigh").checked     = !!currentSettings.blockOnHigh;
+  document.getElementById("minSeverityAlert").value  = currentSettings.minSeverityAlert ?? 2;
+  document.getElementById("showNotifications").checked = !!currentSettings.showNotifications;
+  document.getElementById("whitelistDomains").value  = (currentSettings.whitelistDomains || []).join("\n");
+  document.getElementById("whitelistIPs").value      = (currentSettings.whitelistIPs     || []).join("\n");
+}
+
+function collectForm() {
+  return {
+    nodeURL:           document.getElementById("nodeURL").value.trim(),
+    checkDownloads:    document.getElementById("checkDownloads").checked,
+    checkDomains:      document.getElementById("checkDomains").checked,
+    checkIPs:          document.getElementById("checkIPs").checked,
+    blockOnCritical:   document.getElementById("blockOnCritical").checked,
+    blockOnHigh:       document.getElementById("blockOnHigh").checked,
+    minSeverityAlert:  parseInt(document.getElementById("minSeverityAlert").value),
+    showNotifications: document.getElementById("showNotifications").checked,
+    whitelistDomains:  document.getElementById("whitelistDomains").value
+      .split("\n").map(s => s.trim()).filter(Boolean),
+    whitelistIPs: document.getElementById("whitelistIPs").value
+      .split("\n").map(s => s.trim()).filter(Boolean),
+  };
+}
+
+// ============================================================
+// Node status check
+// ============================================================
+async function checkNodeStatus() {
+  const dot   = document.getElementById("header-dot");
+  const label = document.getElementById("header-node-status");
+  const nodeURL = document.getElementById("nodeURL").value.trim() || DEFAULTS.nodeURL;
+
+  try {
+    const res = await fetch(`${nodeURL}/cosmos/base/tendermint/v1beta1/node_info`,
+      { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      const nodeId = data?.default_node_info?.default_node_id?.slice(0,8) || "online";
+      dot.className   = "dot";
+      label.textContent = `Node online — ${nodeId}…`;
+    } else {
+      dot.className   = "dot";
+      dot.style.background = "#f59e0b";
+      label.textContent = `Node responded ${res.status}`;
+    }
+  } catch {
+    dot.className   = "dot offline";
+    label.textContent = "Node unreachable";
+  }
+}
+
+// ============================================================
+// Events
+// ============================================================
+document.getElementById("btn-save").addEventListener("click", async () => {
+  const s = collectForm();
+  await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: s });
+  const statusEl = document.getElementById("save-status");
+  statusEl.style.display = "inline";
+  setTimeout(() => { statusEl.style.display = "none"; }, 2500);
+  await checkNodeStatus();
+});
+
+document.getElementById("btn-cancel").addEventListener("click", () => {
+  populateForm();
+});
+
+document.getElementById("btn-test-node").addEventListener("click", async () => {
+  const nodeURL = document.getElementById("nodeURL").value.trim();
+  const resultEl = document.getElementById("node-test-result");
+  resultEl.textContent = "Testing…";
+  resultEl.className = "test-result";
+  resultEl.style.display = "block";
+  try {
+    const res = await fetch(`${nodeURL}/cosmos/base/tendermint/v1beta1/node_info`,
+      { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json();
+      const chain = data?.default_node_info?.network || "unknown";
+      const nodeId = data?.default_node_info?.default_node_id?.slice(0,12) || "";
+      resultEl.textContent = `✓ Connected! Chain: ${chain}  Node ID: ${nodeId}…`;
+      resultEl.className = "test-result test-ok";
+    } else {
+      resultEl.textContent = `✗ HTTP ${res.status} — node responded but with error`;
+      resultEl.className = "test-result test-err";
+    }
+  } catch (err) {
+    resultEl.textContent = `✗ Cannot connect: ${err.message}`;
+    resultEl.className = "test-result test-err";
+  }
+});
+
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  if (!confirm("Reset all ThreatAttest Shield settings to defaults?")) return;
+  await chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", settings: DEFAULTS });
+  currentSettings = { ...DEFAULTS };
+  populateForm();
+  const statusEl = document.getElementById("save-status");
+  statusEl.textContent = "✓ Reset to defaults!";
+  statusEl.style.display = "inline";
+  setTimeout(() => { statusEl.style.display = "none"; statusEl.textContent = "✓ Saved!"; }, 2500);
+});
+
+// Auto re-test on nodeURL change
+document.getElementById("nodeURL").addEventListener("blur", () => {
+  document.getElementById("node-test-result").style.display = "none";
+  checkNodeStatus();
+});
+
+// Init
+document.addEventListener("DOMContentLoaded", loadSettings);
+</script>
+</body>
+</html>

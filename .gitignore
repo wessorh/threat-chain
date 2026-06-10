@@ -1,0 +1,100 @@
+# =============================================================================
+# ThreatAttest — .gitignore
+# =============================================================================
+
+# ── Go build outputs ──────────────────────────────────────────────────────────
+bin/
+dist/
+build/
+*.exe
+*.test
+*.out
+coverage.txt
+coverage.html
+cpu.prof
+mem.prof
+
+# Go module cache / vendor
+vendor/
+
+# GoReleaser
+dist/
+
+# ── Node / Browser Extension ──────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# Extension build outputs
+extension/dist/
+extension/build/
+
+# ── Chain runtime data ────────────────────────────────────────────────────────
+# Local chain home directories
+.threatattestd/
+chain/.threatattestd/
+*.ldb
+*.log
+*.pid
+
+# Docker volumes (never committed)
+data/
+
+# ── OS & Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+\#*\#
+.#*
+
+# ── Secrets & Credentials ─────────────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+secrets/
+mnemonic.txt
+*_mnemonic.txt
+
+# ── Test artifacts ────────────────────────────────────────────────────────────
+/tmp/
+testutil/integration/
+*.test.log
+
+# Temporary Go test files (created by shell tests)
+/tmp/compliance_test_*.go
+/tmp/tier_test_*.go
+
+# ── CI / Release artifacts ────────────────────────────────────────────────────
+# GoReleaser snapshot
+dist/
+
+# ── Proto generated (keep sources, ignore generated if desired) ───────────────
+# Uncomment if you prefer to not commit generated protobuf code:
+# *.pb.go
+# *.pb.gw.go

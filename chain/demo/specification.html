@@ -1,0 +1,1655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest — Technical Specification</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0d1117;
+    --bg2:        #161b22;
+    --bg3:        #21262d;
+    --border:     #30363d;
+    --text:       #e6edf3;
+    --text2:      #8b949e;
+    --accent:     #58a6ff;
+    --accent2:    #3fb950;
+    --accent3:    #d2a8ff;
+    --accent4:    #ffa657;
+    --accent5:    #ff7b72;
+    --accent6:    #79c0ff;
+    --tag-bg:     #1f2d3d;
+    --tag-border: #1f6feb;
+    --warn:       #e3b341;
+    --crit:       #f85149;
+    --low:        #3fb950;
+    --med:        #d29922;
+    --info:       #388bfd;
+    --font-mono:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+    --font-sans:  -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    --radius:     6px;
+    --shadow:     0 1px 3px rgba(0,0,0,0.4);
+  }
+
+  html { font-size: 15px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: 1.65;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  nav#sidebar {
+    width: 270px;
+    min-width: 270px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow-y: auto;
+    padding: 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  nav#sidebar .logo {
+    padding: 0 1.25rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+  }
+
+  nav#sidebar .logo h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  nav#sidebar .logo p {
+    font-size: 0.72rem;
+    color: var(--text2);
+    margin-top: 0.2rem;
+  }
+
+  nav#sidebar .nav-section {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text2);
+    font-weight: 600;
+    padding: 0.75rem 1.25rem 0.3rem;
+  }
+
+  nav#sidebar a {
+    display: block;
+    padding: 0.35rem 1.25rem 0.35rem 1.5rem;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 0.82rem;
+    border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  nav#sidebar a:hover,
+  nav#sidebar a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(88,166,255,0.06);
+  }
+
+  nav#sidebar a.sub {
+    padding-left: 2.25rem;
+    font-size: 0.78rem;
+  }
+
+  /* ── Main Content ── */
+  main {
+    flex: 1;
+    overflow-x: hidden;
+    padding: 2.5rem 3rem 4rem;
+    max-width: 960px;
+  }
+
+  /* ── Typography ── */
+  h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text); margin-bottom: 0.5rem; }
+  h2 { font-size: 1.45rem; font-weight: 700; color: var(--text); margin: 2.5rem 0 1rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--accent6); margin: 1.75rem 0 0.6rem; }
+  h4 { font-size: 0.95rem; font-weight: 600; color: var(--accent3); margin: 1.25rem 0 0.4rem; }
+  h5 { font-size: 0.88rem; font-weight: 600; color: var(--text2); margin: 1rem 0 0.3rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  p { margin: 0.6rem 0; color: var(--text); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Section anchors ── */
+  section { margin-bottom: 1rem; }
+  .section-header { display: flex; align-items: baseline; gap: 0.75rem; }
+  .section-id {
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    background: var(--bg3);
+    color: var(--text2);
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  /* ── Hero Banner ── */
+  .hero {
+    background: linear-gradient(135deg, #0d1b2a 0%, #1a2744 50%, #0d1117 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(88,166,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero .version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(88,166,255,0.12);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 20px;
+    padding: 0.2rem 0.75rem;
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    margin-bottom: 0.75rem;
+  }
+
+  .hero h1 { font-size: 2.2rem; line-height: 1.2; margin-bottom: 0.4rem; }
+
+  .hero .subtitle {
+    color: var(--text2);
+    font-size: 0.95rem;
+    max-width: 580px;
+    margin-bottom: 1.25rem;
+  }
+
+  .hero .badges { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+
+  .badge.cosmos  { background: rgba(63,185,80,0.12);  color: var(--accent2); border: 1px solid rgba(63,185,80,0.3); }
+  .badge.comet   { background: rgba(88,166,255,0.12); color: var(--accent);  border: 1px solid rgba(88,166,255,0.3); }
+  .badge.go      { background: rgba(121,192,255,0.12);color: var(--accent6); border: 1px solid rgba(121,192,255,0.3);}
+  .badge.proto   { background: rgba(210,168,255,0.12);color: var(--accent3); border: 1px solid rgba(210,168,255,0.3);}
+  .badge.ibc     { background: rgba(255,166,87,0.12); color: var(--accent4); border: 1px solid rgba(255,166,87,0.3);}
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin: 0.75rem 0;
+  }
+
+  .card.highlight {
+    border-left: 3px solid var(--accent);
+  }
+
+  .card.warn-card {
+    border-left: 3px solid var(--warn);
+    background: rgba(227,179,65,0.06);
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+
+  .module-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    transition: border-color 0.15s;
+  }
+
+  .module-card:hover { border-color: var(--accent); }
+
+  .module-card .mod-name {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .module-card .mod-path {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text2);
+    margin-bottom: 0.5rem;
+  }
+
+  .module-card p {
+    font-size: 0.8rem;
+    color: var(--text2);
+  }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  thead tr {
+    background: var(--bg3);
+    border-bottom: 2px solid var(--border);
+  }
+
+  th {
+    text-align: left;
+    padding: 0.55rem 0.85rem;
+    color: var(--text2);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  td code, th code { font-size: 0.8rem; }
+
+  /* ── Code blocks ── */
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #e6edf3;
+  }
+
+  pre .kw   { color: #ff7b72; }  /* keyword */
+  pre .ty   { color: #79c0ff; }  /* type */
+  pre .str  { color: #a5d6ff; }  /* string */
+  pre .cm   { color: #8b949e; font-style: italic; }  /* comment */
+  pre .num  { color: #d2a8ff; }  /* number */
+  pre .fn   { color: #d2a8ff; }  /* function */
+  pre .fld  { color: #ffa657; }  /* field */
+  pre .op   { color: #ff7b72; }  /* operator */
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+    color: var(--accent3);
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+
+  /* ── Severity / Status pills ── */
+  .pill {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  .pill.crit   { background: rgba(248,81,73,0.15);  color: var(--crit);  border: 1px solid rgba(248,81,73,0.35); }
+  .pill.high   { background: rgba(255,166,87,0.15); color: var(--accent4); border: 1px solid rgba(255,166,87,0.35); }
+  .pill.med    { background: rgba(210,153,34,0.15); color: var(--med);   border: 1px solid rgba(210,153,34,0.35); }
+  .pill.low    { background: rgba(63,185,80,0.15);  color: var(--low);   border: 1px solid rgba(63,185,80,0.35); }
+  .pill.info   { background: rgba(56,139,253,0.15); color: var(--info);  border: 1px solid rgba(56,139,253,0.35); }
+  .pill.active { background: rgba(63,185,80,0.15);  color: var(--low);   border: 1px solid rgba(63,185,80,0.35); }
+  .pill.revok  { background: rgba(248,81,73,0.12);  color: var(--crit);  border: 1px solid rgba(248,81,73,0.25); }
+  .pill.disp   { background: rgba(227,179,65,0.12); color: var(--warn);  border: 1px solid rgba(227,179,65,0.25); }
+  .pill.exp    { background: rgba(139,148,158,0.12);color: var(--text2); border: 1px solid var(--border); }
+  .pill.blue   { background: rgba(88,166,255,0.12); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+
+  /* ── Lifecycle diagram ── */
+  .lifecycle {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .lc-row { display: flex; align-items: center; gap: 0.5rem; }
+
+  .lc-state {
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    min-width: 110px;
+  }
+
+  .lc-state.active  { background: rgba(63,185,80,0.15);  border: 1px solid rgba(63,185,80,0.4);  color: var(--low); }
+  .lc-state.expired { background: rgba(139,148,158,0.12);border: 1px solid var(--border); color: var(--text2); }
+  .lc-state.revoked { background: rgba(248,81,73,0.12);  border: 1px solid rgba(248,81,73,0.35); color: var(--crit); }
+  .lc-state.disputed{ background: rgba(227,179,65,0.12); border: 1px solid rgba(227,179,65,0.35);color: var(--warn); }
+  .lc-state.pending { background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3); color: var(--accent);}
+  .lc-state.super   { background: rgba(210,168,255,0.12);border: 1px solid rgba(210,168,255,0.3);color: var(--accent3);}
+
+  .lc-arrow {
+    color: var(--text2);
+    font-size: 1rem;
+  }
+
+  .lc-label {
+    font-size: 0.7rem;
+    color: var(--text2);
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  /* ── Callouts ── */
+  .callout {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius);
+    margin: 0.75rem 0;
+    font-size: 0.85rem;
+  }
+
+  .callout.note   { background: rgba(88,166,255,0.08);  border-left: 3px solid var(--accent);  }
+  .callout.tip    { background: rgba(63,185,80,0.08);   border-left: 3px solid var(--accent2); }
+  .callout.warn   { background: rgba(227,179,65,0.08);  border-left: 3px solid var(--warn);    }
+  .callout.danger { background: rgba(248,81,73,0.08);   border-left: 3px solid var(--crit);    }
+
+  .callout .icon { font-size: 1rem; flex-shrink: 0; padding-top: 0.05rem; }
+  .callout .body { flex: 1; }
+  .callout .body strong { display: block; margin-bottom: 0.2rem; }
+
+  /* ── Lists ── */
+  ul, ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin: 0.25rem 0; font-size: 0.88rem; }
+
+  /* ── Formula box ── */
+  .formula {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--accent3);
+    margin: 0.75rem 0;
+    overflow-x: auto;
+  }
+
+  /* ── Two-column layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0.75rem 0; }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── Divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* ── Print / scroll padding ── */
+  :target { scroll-margin-top: 1.5rem; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+</style>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SIDEBAR NAV
+═══════════════════════════════════════════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="logo">
+    <h1>⚡ ThreatAttest</h1>
+    <p>Technical Specification v0.1.0</p>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Introduction</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#tokenomics">Tokenomics (TATST)</a>
+
+  <div class="nav-section">Modules</div>
+  <a href="#mod-attestation">x/attestation</a>
+  <a href="#proto-attestation" class="sub">Proto Types</a>
+  <a href="#attestation-msgs" class="sub">Messages</a>
+  <a href="#attestation-validation" class="sub">Validation Rules</a>
+  <a href="#attestation-lifecycle" class="sub">Lifecycle</a>
+  <a href="#trust-score" class="sub">Trust Score</a>
+  <a href="#mod-reputation">x/reputation</a>
+  <a href="#mod-tatmint">x/tatmint</a>
+  <a href="#mod-ipfsverify">x/ipfsverify</a>
+
+  <div class="nav-section">Data Model</div>
+  <a href="#attestation-record">AttestationRecord</a>
+  <a href="#detection-rule">DetectionRuleRef</a>
+  <a href="#dispute-record">DisputeRecord</a>
+  <a href="#module-params">Module Params</a>
+
+  <div class="nav-section">CLI Reference</div>
+  <a href="#cli-attest-file">attest-file</a>
+  <a href="#cli-tx">tx attestation</a>
+  <a href="#cli-query">query attestation</a>
+  <a href="#cli-node">Node Commands</a>
+
+  <div class="nav-section">Network</div>
+  <a href="#genesis">Genesis &amp; Bootstrap</a>
+  <a href="#ibc">IBC Integration</a>
+  <a href="#ports">Ports &amp; Endpoints</a>
+  <a href="#security">Security Model</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     MAIN CONTENT
+═══════════════════════════════════════════════════════════════════════ -->
+<main>
+
+<!-- ── HERO ─────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="version-badge">⚡ v0.1.0 · Draft Specification</div>
+  <h1>ThreatAttest</h1>
+  <p class="subtitle">
+    A Cosmos SDK application-specific blockchain for publishing, endorsing, and
+    querying cryptographically verifiable threat intelligence attestations for
+    files, URLs, and IPv4 addresses.
+  </p>
+  <div class="badges">
+    <span class="badge cosmos">Cosmos SDK v0.50.9</span>
+    <span class="badge comet">CometBFT v0.38.9</span>
+    <span class="badge go">Go 1.22</span>
+    <span class="badge proto">Proto3</span>
+    <span class="badge ibc">IBC-enabled</span>
+  </div>
+</div>
+
+<!-- ── 1. OVERVIEW ───────────────────────────────────────────────── -->
+<section id="overview">
+<h2>1. Introduction</h2>
+
+<p>
+  ThreatAttest is an application-specific blockchain (appchain) built on the
+  Cosmos SDK. Its primary purpose is to provide a censorship-resistant,
+  tamper-evident ledger of threat intelligence data where analysts can publish
+  SHA-256-based attestations of malicious artefacts and the broader community
+  can endorse, revoke, or dispute those attestations.
+</p>
+
+<p>
+  Every attestation is associated with a cryptographic identity (the attester's
+  on-chain key), a reputation score, and a time-to-live. Consumers — such as
+  endpoint security products, network appliances, or SIEM integrations — can
+  query the chain's gRPC or REST API to check whether a file hash, URL, or IP
+  address has been flagged as malicious, and with what confidence and severity.
+</p>
+
+<div class="card-grid">
+  <div class="module-card">
+    <div class="mod-name">Decentralised</div>
+    <p>No single operator controls the threat feed. Any validator set can run the chain.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">Attributable</div>
+    <p>Every attestation is signed by the attester's secp256k1 key and stored immutably.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">Reputation-gated</div>
+    <p>Minimum reputation score required to publish, preventing Sybil spam attacks.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">IPFS-linked</div>
+    <p>Detection rules (YARA, Sigma, Snort) are pinned on IPFS and anchored on-chain via CIDv1.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">IBC-enabled</div>
+    <p>Cross-chain threat feed subscriptions via the Inter-Blockchain Communication protocol.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">Time-limited</div>
+    <p>Every attestation carries a TTL; automatic expiry prevents stale data accumulation.</p>
+  </div>
+</div>
+</section>
+
+<!-- ── 2. ARCHITECTURE ───────────────────────────────────────────── -->
+<section id="architecture">
+<h2>2. Architecture</h2>
+
+<h3>2.1 Module Layout</h3>
+
+<div class="card-grid">
+  <div class="module-card">
+    <div class="mod-name">x/attestation</div>
+    <div class="mod-path">github.com/threatattest/chain/x/attestation</div>
+    <p>Core module. Publish, endorse, revoke, dispute file/URL/IPv4 attestations. Stores <code>AttestationRecord</code> and <code>DisputeRecord</code> in the KV store.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">x/reputation</div>
+    <div class="mod-path">github.com/threatattest/chain/x/reputation</div>
+    <p>Non-transferable reputation scores per attester address. Three tiers gate publishing privileges. Decays after 90 days of inactivity.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">x/tatmint</div>
+    <div class="mod-path">github.com/threatattest/chain/x/tatmint</div>
+    <p>Bitcoin-style halving emission schedule. Issues block rewards in <code>utatst</code>. Total supply cap: 1,000,000,000 TATST.</p>
+  </div>
+  <div class="module-card">
+    <div class="mod-name">x/ipfsverify</div>
+    <div class="mod-path">github.com/threatattest/chain/x/ipfsverify</div>
+    <p>Validator-operated IPFS content verification. Jobs resolve when ≥3 validators confirm a CIDv1 hash matches its SHA-256.</p>
+  </div>
+</div>
+
+<h3>2.2 Dependency Graph</h3>
+<pre>
+┌─────────────────────────────────────────────────────────┐
+│                    ThreatAttestApp                       │
+│                  (app/app.go — BaseApp)                  │
+└───────────┬──────────┬────────────┬─────────────────────┘
+            │          │            │
+    ┌───────▼──┐  ┌────▼──────┐  ┌─▼──────────┐
+    │x/attest- │  │x/repu-    │  │x/tatmint   │
+    │ation     │  │tation     │  │            │
+    │          │  │           │  │  emission  │
+    │ publish  │◄─┤ gate      │  │  schedule  │
+    │ endorse  │  │ scoring   │  └────────────┘
+    │ revoke   │  └───────────┘
+    │ dispute  │
+    └──────────┴──────────────────────┐
+                                      │
+                             ┌────────▼──────┐
+                             │ x/ipfsverify  │
+                             │  CID verify   │
+                             │  jobs         │
+                             └───────────────┘
+</pre>
+
+<h3>2.3 Standard Cosmos SDK Modules Included</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Module</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>x/auth</code></td><td>Account management, tx authentication</td></tr>
+    <tr><td><code>x/bank</code></td><td>Token transfers, balance queries</td></tr>
+    <tr><td><code>x/staking</code></td><td>Validator set, delegation</td></tr>
+    <tr><td><code>x/slashing</code></td><td>Validator misbehaviour penalties</td></tr>
+    <tr><td><code>x/gov</code></td><td>On-chain governance for param changes</td></tr>
+    <tr><td><code>x/distribution</code></td><td>Fee and reward distribution</td></tr>
+    <tr><td><code>x/upgrade</code></td><td>On-chain software upgrades</td></tr>
+    <tr><td><code>x/authz</code></td><td>Authorisation grants</td></tr>
+    <tr><td><code>x/feegrant</code></td><td>Fee allowances</td></tr>
+    <tr><td><code>x/params</code></td><td>Parameter management</td></tr>
+    <tr><td><code>x/ibc</code></td><td>Inter-Blockchain Communication</td></tr>
+    <tr><td><code>x/capability</code></td><td>IBC capability routing</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ── 3. TOKENOMICS ─────────────────────────────────────────────── -->
+<section id="tokenomics">
+<h2>3. Tokenomics — TATST</h2>
+
+<div class="two-col">
+  <div class="card highlight">
+    <h4>Token Details</h4>
+    <table>
+      <tbody>
+        <tr><td><strong>Name</strong></td><td>ThreatAttest Token</td></tr>
+        <tr><td><strong>Symbol</strong></td><td>TATST</td></tr>
+        <tr><td><strong>Base Denom</strong></td><td><code>utatst</code> (micro)</td></tr>
+        <tr><td><strong>Precision</strong></td><td>1 TATST = 1,000,000 utatst</td></tr>
+        <tr><td><strong>Total Cap</strong></td><td>1,000,000,000 TATST</td></tr>
+        <tr><td><strong>Bech32 Prefix</strong></td><td><code>tatst</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card highlight">
+    <h4>Emission Schedule</h4>
+    <table>
+      <tbody>
+        <tr><td><strong>Initial Reward</strong></td><td>10 TATST / block</td></tr>
+        <tr><td><strong>Halving Period</strong></td><td>2,102,400 blocks (~4 years)</td></tr>
+        <tr><td><strong>Max Halvings</strong></td><td>30</td></tr>
+        <tr><td><strong>Block Time</strong></td><td>~2 seconds</td></tr>
+        <tr><td><strong>Epoch 0 Total</strong></td><td>21,024,000 TATST</td></tr>
+        <tr><td><strong>Converges to</strong></td><td>~42,048,000 TATST minted</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h3>3.1 Emission Per Epoch</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Epoch</th><th>Block Reward</th><th>Epoch Total</th><th>Cumulative</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>10 TATST</td><td>21,024,000 TATST</td><td>21,024,000</td></tr>
+    <tr><td>1</td><td>5 TATST</td><td>10,512,000 TATST</td><td>31,536,000</td></tr>
+    <tr><td>2</td><td>2.5 TATST</td><td>5,256,000 TATST</td><td>36,792,000</td></tr>
+    <tr><td>3</td><td>1.25 TATST</td><td>2,628,000 TATST</td><td>39,420,000</td></tr>
+    <tr><td>4+</td><td>Halves each epoch…</td><td>…</td><td>→ ~42,048,000</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout note">
+  <span class="icon">ℹ</span>
+  <div class="body">
+    <strong>Supply note</strong>
+    The ~42M TATST emitted via block rewards is well under the 1B cap. The
+    remainder (~958M) is reserved for genesis allocation and the community pool,
+    per governance parameters.
+  </div>
+</div>
+
+<h3>3.2 Fee Mechanism</h3>
+<p>
+  Transaction fees are paid in <code>utatst</code>. A typical attestation publish
+  transaction costs <code>500 utatst</code> in fees (configurable via
+  <code>--minimum-gas-prices</code>). Fees are distributed to validators via
+  <code>x/distribution</code>. Dispute bonds are locked from the challenger's
+  account and returned (or burned) upon resolution.
+</p>
+</section>
+
+<!-- ── 4. x/attestation ──────────────────────────────────────────── -->
+<section id="mod-attestation">
+<h2>4. Module: x/attestation</h2>
+
+<p>
+  The core module. All threat intelligence data flows through this module.
+  It maintains a KV store of <code>AttestationRecord</code> objects, indexed by
+  attestation ID (a derived SHA-256), artifact SHA-256, attester address, and
+  status.
+</p>
+
+<!-- 4.1 Proto Types -->
+<section id="proto-attestation">
+<h3>4.1 Protobuf Enumerations</h3>
+
+<h4>ArtifactType</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Int</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>ARTIFACT_TYPE_UNSPECIFIED</code></td><td>0</td><td>Default — invalid for new attestations</td></tr>
+    <tr><td><code>ARTIFACT_TYPE_FILE</code></td><td>1</td><td>SHA-256 of raw file bytes</td></tr>
+    <tr><td><code>ARTIFACT_TYPE_URL</code></td><td>2</td><td>SHA-256 of normalised UTF-8 URL bytes</td></tr>
+    <tr><td><code>ARTIFACT_TYPE_IPV4</code></td><td>3</td><td>SHA-256 of 4-byte big-endian packed address</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>SeverityLevel</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Int</th><th>Label</th><th>Use when</th></tr></thead>
+  <tbody>
+    <tr><td><code>SEVERITY_UNSPECIFIED</code></td><td>0</td><td><span class="pill exp">UNSPEC</span></td><td>Not assessed</td></tr>
+    <tr><td><code>SEVERITY_INFO</code></td><td>1</td><td><span class="pill info">INFO</span></td><td>Informational only (e.g. grey-area PUP)</td></tr>
+    <tr><td><code>SEVERITY_LOW</code></td><td>2</td><td><span class="pill low">LOW</span></td><td>Minimal risk (adware)</td></tr>
+    <tr><td><code>SEVERITY_MEDIUM</code></td><td>3</td><td><span class="pill med">MEDIUM</span></td><td>Moderate risk (spyware, PUA)</td></tr>
+    <tr><td><code>SEVERITY_HIGH</code></td><td>4</td><td><span class="pill high">HIGH</span></td><td>Serious risk (RAT, infostealer)</td></tr>
+    <tr><td><code>SEVERITY_CRITICAL</code></td><td>5</td><td><span class="pill crit">CRITICAL</span></td><td>Catastrophic risk (wiper, ransomware)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>AttestationStatus</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Label</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>STATUS_ACTIVE</code></td><td><span class="pill active">ACTIVE</span></td><td>Attestation is live and counts toward is-malicious queries</td></tr>
+    <tr><td><code>STATUS_EXPIRED</code></td><td><span class="pill exp">EXPIRED</span></td><td>TTL elapsed; not counted in queries</td></tr>
+    <tr><td><code>STATUS_REVOKED</code></td><td><span class="pill revok">REVOKED</span></td><td>Revoked by the original attester</td></tr>
+    <tr><td><code>STATUS_DISPUTED</code></td><td><span class="pill disp">DISPUTED</span></td><td>Active dispute; pending governance resolution</td></tr>
+    <tr><td><code>STATUS_SUPERSEDED</code></td><td><span class="pill blue">SUPERSEDED</span></td><td>Replaced by a newer attestation from the same attester</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>TLPLevel (Traffic Light Protocol)</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Sharing Policy</th></tr></thead>
+  <tbody>
+    <tr><td><code>TLP_WHITE</code></td><td>Unrestricted — may be shared publicly</td></tr>
+    <tr><td><code>TLP_GREEN</code></td><td>Community sharing — not for public release</td></tr>
+    <tr><td><code>TLP_AMBER</code></td><td>Limited sharing — recipients only</td></tr>
+    <tr><td><code>TLP_RED</code></td><td>Restricted — no onward sharing</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>RuleType &amp; RuleAppliesTo</h4>
+<div class="two-col">
+<div class="table-wrap">
+<table>
+  <thead><tr><th>RuleType</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>RULE_TYPE_YARA</code></td><td>YARA pattern rule</td></tr>
+    <tr><td><code>RULE_TYPE_SIGMA</code></td><td>Sigma detection rule</td></tr>
+    <tr><td><code>RULE_TYPE_SNORT</code></td><td>Snort/Suricata rule</td></tr>
+    <tr><td><code>RULE_TYPE_SURICATA</code></td><td>Suricata rule</td></tr>
+    <tr><td><code>RULE_TYPE_OPENIOC</code></td><td>OpenIOC indicator</td></tr>
+    <tr><td><code>RULE_TYPE_CUSTOM</code></td><td>Custom format</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>RuleAppliesTo</th><th>Target</th></tr></thead>
+  <tbody>
+    <tr><td><code>APPLIES_TO_FILE_BYTES</code></td><td>Raw file bytes</td></tr>
+    <tr><td><code>APPLIES_TO_URL_PATH</code></td><td>URL path component</td></tr>
+    <tr><td><code>APPLIES_TO_URL_FULL</code></td><td>Full URL string</td></tr>
+    <tr><td><code>APPLIES_TO_IP_TRAFFIC</code></td><td>Network traffic to IP</td></tr>
+    <tr><td><code>APPLIES_TO_ANY</code></td><td>Any artefact type</td></tr>
+  </tbody>
+</table>
+</div>
+</div>
+
+<h4>DisputeGround</h4>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Value</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>DISPUTE_GROUND_FALSE_POSITIVE</code></td><td>Artefact is not actually malicious</td></tr>
+    <tr><td><code>DISPUTE_GROUND_INCORRECT_SEVERITY</code></td><td>Severity level is wrong</td></tr>
+    <tr><td><code>DISPUTE_GROUND_FABRICATED_EVIDENCE</code></td><td>Supporting evidence is forged</td></tr>
+    <tr><td><code>DISPUTE_GROUND_STALE_REUSE</code></td><td>Hash reused from an old, cleaned artefact</td></tr>
+    <tr><td><code>DISPUTE_GROUND_SYBIL_ATTACK</code></td><td>Attester is a Sybil identity</td></tr>
+  </tbody>
+</table>
+</div>
+</section><!-- /proto-attestation -->
+
+<!-- 4.2 AttestationRecord -->
+<section id="attestation-record">
+<h3>4.2 AttestationRecord (on-chain data model)</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>attestation_id</code></td><td>string</td><td>SHA-256(<em>artifact_sha256</em>|<em>attester</em>|<em>published_at</em>) — primary key</td></tr>
+    <tr><td><code>schema_version</code></td><td>uint32</td><td>Always <code>1</code> in v0.1</td></tr>
+    <tr><td><code>artifact_type</code></td><td>ArtifactType</td><td>FILE, URL, or IPV4</td></tr>
+    <tr><td><code>artifact_sha256</code></td><td>string</td><td>Hex-encoded SHA-256 of the artefact</td></tr>
+    <tr><td><code>artifact_value</code></td><td>string</td><td>Raw value (URL string, IPv4 string; empty for files)</td></tr>
+    <tr><td><code>published_at</code></td><td>int64</td><td>Unix timestamp of submission</td></tr>
+    <tr><td><code>ttl_seconds</code></td><td>uint32</td><td>Time-to-live in seconds</td></tr>
+    <tr><td><code>expires_at</code></td><td>int64</td><td><code>published_at + ttl_seconds</code></td></tr>
+    <tr><td><code>severity</code></td><td>SeverityLevel</td><td>Threat severity (INFO→CRITICAL)</td></tr>
+    <tr><td><code>confidence</code></td><td>uint32</td><td>Analyst confidence 0–100</td></tr>
+    <tr><td><code>threat_category</code></td><td>[]string</td><td>TATST native categories or MITRE ATT&CK IDs</td></tr>
+    <tr><td><code>tags</code></td><td>[]string</td><td>Free-form labels (max 16, each ≤ 32 bytes)</td></tr>
+    <tr><td><code>attester</code></td><td>string</td><td>Bech32 attester address (<code>tatst1…</code>)</td></tr>
+    <tr><td><code>detection_rules</code></td><td>[]DetectionRuleRef</td><td>IPFS-linked detection rules</td></tr>
+    <tr><td><code>supersedes</code></td><td>string</td><td>ID of an older attestation this replaces</td></tr>
+    <tr><td><code>related_to</code></td><td>[]string</td><td>Related attestation IDs (max 32)</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>Human-readable description (max 1024 bytes, no HTML)</td></tr>
+    <tr><td><code>tlp_level</code></td><td>TLPLevel</td><td>Traffic Light Protocol classification</td></tr>
+    <tr><td><code>block_height</code></td><td>uint64</td><td>Block height at which the record was stored</td></tr>
+    <tr><td><code>tx_hash</code></td><td>string</td><td>Transaction hash</td></tr>
+    <tr><td><code>status</code></td><td>AttestationStatus</td><td>Current lifecycle state</td></tr>
+    <tr><td><code>endorsement_count</code></td><td>uint32</td><td>Number of endorsements received</td></tr>
+    <tr><td><code>dispute_count</code></td><td>uint32</td><td>Number of disputes filed</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- 4.3 DetectionRuleRef -->
+<section id="detection-rule">
+<h3>4.3 DetectionRuleRef</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>rule_id</code></td><td>string</td><td>SHA-256(<em>cid</em>|<em>rule_sha256</em>) — computed by keeper</td></tr>
+    <tr><td><code>rule_type</code></td><td>RuleType</td><td>YARA, SIGMA, SNORT, SURICATA, OPENIOC, CUSTOM</td></tr>
+    <tr><td><code>rule_name</code></td><td>string</td><td>Human-readable rule name</td></tr>
+    <tr><td><code>rule_ipfs_cid</code></td><td>string</td><td>CIDv1 (base32, starts with "b") of the rule file on IPFS</td></tr>
+    <tr><td><code>rule_sha256</code></td><td>string</td><td>SHA-256 of the rule file content</td></tr>
+    <tr><td><code>rule_version</code></td><td>string</td><td>Semantic version string</td></tr>
+    <tr><td><code>rule_author</code></td><td>string</td><td>Author identifier</td></tr>
+    <tr><td><code>applies_to</code></td><td>RuleAppliesTo</td><td>Which artefact field the rule targets</td></tr>
+    <tr><td><code>min_yara_version</code></td><td>string</td><td>Minimum YARA version required (YARA rules only)</td></tr>
+    <tr><td><code>verified</code></td><td>bool</td><td>Set to <code>true</code> by x/ipfsverify after confirmation</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- 4.4 DisputeRecord -->
+<section id="dispute-record">
+<h3>4.4 DisputeRecord</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>dispute_id</code></td><td>string</td><td>SHA-256(<em>attestation_id</em>|<em>disputer</em>|<em>created_at</em>)</td></tr>
+    <tr><td><code>attestation_id</code></td><td>string</td><td>The attestation being disputed</td></tr>
+    <tr><td><code>challenger</code></td><td>string</td><td>Bech32 address of the disputer</td></tr>
+    <tr><td><code>ground</code></td><td>DisputeGround</td><td>Formal ground for the dispute</td></tr>
+    <tr><td><code>reason</code></td><td>string</td><td>Free-text explanation</td></tr>
+    <tr><td><code>evidence_cid</code></td><td>string</td><td>Optional IPFS CIDv1 of supporting evidence</td></tr>
+    <tr><td><code>opened_at</code></td><td>int64</td><td>Unix timestamp when dispute was opened</td></tr>
+    <tr><td><code>opened_height</code></td><td>uint64</td><td>Block height when dispute was opened</td></tr>
+    <tr><td><code>rebuttal_cid</code></td><td>string</td><td>Optional IPFS CIDv1 of the attester's rebuttal</td></tr>
+    <tr><td><code>status</code></td><td>string</td><td><code>OPEN</code> | <code>RESOLVED_UPHELD</code> | <code>RESOLVED_REJECTED</code> | <code>DISMISSED</code></td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- 4.5 Messages -->
+<section id="attestation-msgs">
+<h3>4.5 Transaction Messages</h3>
+
+<h4>MsgPublishAttestation</h4>
+<pre><span class="kw">type</span> <span class="ty">MsgPublishAttestation</span> <span class="kw">struct</span> {
+    <span class="fld">Attester</span>         <span class="ty">string</span>                   <span class="cm">// tatst1... bech32</span>
+    <span class="fld">ArtifactType</span>     <span class="ty">ArtifactType</span>             <span class="cm">// FILE | URL | IPV4</span>
+    <span class="fld">ArtifactSHA256</span>   <span class="ty">string</span>                   <span class="cm">// 64-char hex</span>
+    <span class="fld">RawValue</span>         <span class="ty">string</span>                   <span class="cm">// URL/IP string; empty for files</span>
+    <span class="fld">Severity</span>         <span class="ty">SeverityLevel</span>
+    <span class="fld">TLP</span>              <span class="ty">TLPLevel</span>
+    <span class="fld">TTLSeconds</span>       <span class="ty">int64</span>                    <span class="cm">// 3600 – 31,536,000</span>
+    <span class="fld">Confidence</span>       <span class="ty">uint32</span>                   <span class="cm">// 0–100</span>
+    <span class="fld">Description</span>      <span class="ty">string</span>                   <span class="cm">// max 1024 bytes, no HTML</span>
+    <span class="fld">Tags</span>             []<span class="ty">string</span>                 <span class="cm">// max 16, each ≤32 bytes</span>
+    <span class="fld">ThreatCategories</span> []<span class="ty">string</span>                 <span class="cm">// max 8 entries</span>
+    <span class="fld">DetectionRules</span>   []<span class="ty">DetectionRuleRef</span>
+    <span class="fld">RelatedTo</span>        []<span class="ty">string</span>                 <span class="cm">// max 32 attestation IDs</span>
+    <span class="fld">MitreAttackIDs</span>   []<span class="ty">string</span>                 <span class="cm">// e.g. T1059, TA0002</span>
+    <span class="fld">AttesterSig</span>      <span class="ty">string</span>
+}</pre>
+
+<h4>MsgEndorseAttestation</h4>
+<pre><span class="kw">type</span> <span class="ty">MsgEndorseAttestation</span> <span class="kw">struct</span> {
+    <span class="fld">Endorser</span>       <span class="ty">string</span>  <span class="cm">// must differ from original attester</span>
+    <span class="fld">AttestationID</span>  <span class="ty">string</span>  <span class="cm">// target attestation_id</span>
+    <span class="fld">Reason</span>         <span class="ty">string</span>  <span class="cm">// optional, max 512 bytes</span>
+}</pre>
+
+<h4>MsgRevokeAttestation</h4>
+<pre><span class="kw">type</span> <span class="ty">MsgRevokeAttestation</span> <span class="kw">struct</span> {
+    <span class="fld">Attester</span>      <span class="ty">string</span>  <span class="cm">// must be original attester</span>
+    <span class="fld">AttestationID</span> <span class="ty">string</span>
+    <span class="fld">Reason</span>        <span class="ty">string</span>  <span class="cm">// optional, max 512 bytes</span>
+}</pre>
+
+<h4>MsgDisputeAttestation</h4>
+<pre><span class="kw">type</span> <span class="ty">MsgDisputeAttestation</span> <span class="kw">struct</span> {
+    <span class="fld">Challenger</span>    <span class="ty">string</span>         <span class="cm">// must differ from original attester</span>
+    <span class="fld">AttestationID</span> <span class="ty">string</span>
+    <span class="fld">Ground</span>        <span class="ty">DisputeGround</span>  <span class="cm">// must not be UNSPECIFIED</span>
+    <span class="fld">Evidence</span>      <span class="ty">string</span>         <span class="cm">// optional: free-text or IPFS CIDv1</span>
+}</pre>
+</section>
+
+<!-- 4.6 Validation Rules -->
+<section id="attestation-validation">
+<h3>4.6 Validation Rules (ValidateBasic)</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Rule</th><th>Error Code</th></tr></thead>
+  <tbody>
+    <tr><td><code>attester</code></td><td>Valid bech32, prefix <code>tatst</code></td><td><code>ErrInvalidAttesterAddress</code> (33)</td></tr>
+    <tr><td><code>artifact_type</code></td><td>Must not be UNSPECIFIED</td><td><code>ErrInvalidArtifactType</code> (2)</td></tr>
+    <tr><td><code>artifact_sha256</code></td><td>64-char lowercase hex; must not equal <code>EmptySHA256</code></td><td><code>ErrInvalidSHA256</code> (3)</td></tr>
+    <tr><td><code>ttl_seconds</code></td><td>3600 ≤ TTL ≤ 31,536,000 (365d); IPv4 max 7,776,000 (90d)</td><td><code>ErrTTLOutOfRange</code> (5)</td></tr>
+    <tr><td><code>confidence</code></td><td>0 ≤ confidence ≤ 100</td><td><code>ErrInvalidConfidence</code> (6)</td></tr>
+    <tr><td><code>description</code></td><td>≤ 1024 bytes; no HTML tags (<code>&lt;…&gt;</code>)</td><td><code>ErrDescriptionTooLong</code> (9) / <code>ErrHTMLNotAllowed</code> (10)</td></tr>
+    <tr><td><code>tags</code></td><td>≤ 16 entries; each ≤ 32 bytes</td><td><code>ErrTooManyTags</code> (31) / <code>ErrTagTooLong</code> (30)</td></tr>
+    <tr><td><code>threat_categories</code></td><td>≤ 8 entries; each must be a valid TATST code or MITRE ID</td><td><code>ErrTooManyCategories</code> (32) / <code>ErrInvalidThreatCategory</code> (8)</td></tr>
+    <tr><td><code>related_to</code></td><td>≤ 32 entries</td><td><code>ErrTooManyRelatedTo</code> (36)</td></tr>
+    <tr><td><code>raw_value</code> (URL)</td><td>Required; SHA-256 must match <code>sha256(normalize(url))</code></td><td><code>ErrMissingRawValue</code> (37) / <code>ErrSHA256Mismatch</code> (38) / <code>ErrInvalidURL</code> (39)</td></tr>
+    <tr><td><code>raw_value</code> (IPv4)</td><td>Required; must not be IANA-reserved; SHA-256 must match</td><td><code>ErrReservedIPv4</code> (12) / <code>ErrSHA256Mismatch</code> (38)</td></tr>
+    <tr><td><code>detection_rules[i].rule_ipfs_cid</code></td><td>Valid CIDv1 (<code>^b[a-z2-7]{58,}$</code>)</td><td><code>ErrInvalidCID</code> (15)</td></tr>
+    <tr><td>Duplicate check</td><td>No identical active attestation from same attester</td><td><code>ErrDuplicateAttestation</code> (44)</td></tr>
+    <tr><td>Endorser ≠ Attester</td><td>Self-endorsement rejected</td><td><code>ErrSelfEndorse</code> (22)</td></tr>
+    <tr><td>No double endorsement</td><td>Address may only endorse once per attestation</td><td><code>ErrAlreadyEndorsed</code> (23)</td></tr>
+    <tr><td>Revoke authority</td><td>Only original attester may revoke</td><td><code>ErrUnauthorizedRevoke</code> (27)</td></tr>
+    <tr><td>Dispute self-guard</td><td>Attester cannot dispute own attestation</td><td><code>ErrSelfDispute</code> (41)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>Valid TATST Threat Categories</h4>
+<p>The following TATST native codes are accepted in <code>threat_categories</code>. MITRE ATT&amp;CK tactic IDs (<code>TA####</code>) and technique IDs (<code>T####[.###]</code>) are also accepted.</p>
+<pre>TATST:MALWARE  TATST:PHISHING   TATST:C2        TATST:CRYPTOMINER
+TATST:RANSOMWARE  TATST:EXPLOIT  TATST:SCANNER  TATST:SPAM
+TATST:BOTNET  TATST:INFOSTEALER  TATST:DROPPER  TATST:BACKDOOR</pre>
+</section>
+
+<!-- 4.7 Lifecycle -->
+<section id="attestation-lifecycle">
+<h3>4.7 Attestation Lifecycle</h3>
+
+<div class="lifecycle">
+  <div class="lc-row">
+    <div class="lc-state pending">GENESIS</div>
+    <span class="lc-arrow">→</span>
+    <div>
+      <div class="lc-state active">ACTIVE</div>
+      <div class="lc-label">MsgPublishAttestation</div>
+    </div>
+  </div>
+  <div class="lc-row">
+    <span class="lc-arrow" style="margin-left:200px">↙</span>
+    <span class="lc-arrow" style="margin-left:30px">↓</span>
+    <span class="lc-arrow" style="margin-left:30px">↘</span>
+  </div>
+  <div class="lc-row" style="gap:1.5rem">
+    <div>
+      <div class="lc-state expired">EXPIRED</div>
+      <div class="lc-label">TTL elapsed</div>
+    </div>
+    <div>
+      <div class="lc-state revoked">REVOKED</div>
+      <div class="lc-label">MsgRevokeAttestation</div>
+    </div>
+    <div>
+      <div class="lc-state disputed">DISPUTED</div>
+      <div class="lc-label">MsgDisputeAttestation</div>
+    </div>
+    <div>
+      <div class="lc-state super">SUPERSEDED</div>
+      <div class="lc-label">New attestation with<br>supersedes field set</div>
+    </div>
+  </div>
+  <div class="lc-row" style="margin-top:0.5rem">
+    <div class="lc-label" style="margin-left:330px">↓ Governance resolves</div>
+  </div>
+  <div class="lc-row" style="gap:1.5rem; margin-top:0.2rem">
+    <div style="margin-left:280px">
+      <div class="lc-state active" style="font-size:0.72rem">ACTIVE (upheld)</div>
+    </div>
+    <div>
+      <div class="lc-state revoked" style="font-size:0.72rem">REVOKED (rejected)</div>
+    </div>
+  </div>
+</div>
+
+<div class="callout note">
+  <span class="icon">ℹ</span>
+  <div class="body">
+    <strong>is-malicious query</strong>
+    A SHA-256 is returned as <em>malicious</em> if at least one
+    <span class="pill active">ACTIVE</span> attestation exists with
+    <code>TrustScore ≥ 60</code>. Expired, revoked, disputed, and superseded
+    attestations are excluded from the result.
+  </div>
+</div>
+</section>
+
+<!-- 4.8 Trust Score -->
+<section id="trust-score">
+<h3>4.8 Trust Score Formula</h3>
+
+<p>The trust score determines query ranking and the <em>is-malicious</em> threshold. It is computed as:</p>
+
+<div class="formula">
+TrustScore = (SeverityWeight × ConfidenceFraction × EndorseFactor × TierWeight) × 1000
+
+  SeverityWeight   = SeverityValue(severity) / 5.0        // 0.0 – 1.0
+  ConfidenceFraction = confidence / 100.0                  // 0.0 – 1.0
+  EndorseFactor    = 1 + log₂(1 + endorsement_count)      // ≥ 1.0
+  TierWeight       = { Tier3 → 1.2, Tier2 → 1.0, Tier1 → 0.8 }
+</div>
+
+<p>Result is capped at <strong>1000</strong>. An attestation is considered <em>malicious</em> when its trust score ≥ 60 (threshold configurable via governance).</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Scenario</th><th>Severity</th><th>Conf.</th><th>Endorsements</th><th>Tier</th><th>Score</th></tr></thead>
+  <tbody>
+    <tr><td>Minimal</td><td>LOW (2)</td><td>50</td><td>0</td><td>1</td><td>~160</td></tr>
+    <tr><td>Typical</td><td>HIGH (4)</td><td>80</td><td>2</td><td>2</td><td>~696</td></tr>
+    <tr><td>Maximum</td><td>CRITICAL (5)</td><td>100</td><td>10</td><td>3</td><td>~1000</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+</section><!-- /mod-attestation -->
+
+<!-- ── 5. x/reputation ───────────────────────────────────────────── -->
+<section id="mod-reputation">
+<h2>5. Module: x/reputation</h2>
+
+<p>
+  The reputation module maintains a non-transferable <code>ReputationRecord</code>
+  per attester address. Reputation is earned by publishing high-quality
+  attestations and lost through successful disputes. It acts as a Sybil-resistance
+  mechanism — new addresses start at score 0 and must earn the right to publish.
+</p>
+
+<h3>5.1 ReputationRecord</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>attester</code></td><td>string</td><td>Bech32 address</td></tr>
+    <tr><td><code>reputation_score</code></td><td>uint32</td><td>Current score (0 – 10,000)</td></tr>
+    <tr><td><code>tier</code></td><td>uint32</td><td>1, 2, or 3 (see below)</td></tr>
+    <tr><td><code>total_attestations</code></td><td>uint64</td><td>All-time attestations published</td></tr>
+    <tr><td><code>clean_expirations</code></td><td>uint64</td><td>Attestations that expired without dispute</td></tr>
+    <tr><td><code>successful_disputes_against</code></td><td>uint64</td><td>Disputes upheld against this attester</td></tr>
+    <tr><td><code>failed_disputes_against</code></td><td>uint64</td><td>Disputes rejected against this attester</td></tr>
+    <tr><td><code>last_activity_unix</code></td><td>int64</td><td>Unix timestamp of last action</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5.2 Tier System</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tier</th><th>Min Score</th><th>Privileges</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="pill exp">Tier 1</span></td>
+      <td>0</td>
+      <td>Can publish (if delegation threshold met). TierWeight = 0.8 in trust score</td>
+    </tr>
+    <tr>
+      <td><span class="pill info">Tier 2</span></td>
+      <td>100</td>
+      <td>Standard publishing. TierWeight = 1.0</td>
+    </tr>
+    <tr>
+      <td><span class="pill active">Tier 3</span></td>
+      <td>500</td>
+      <td>Elevated trust. TierWeight = 1.2 in trust score</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5.3 Score Events</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Event</th><th>Score Change</th></tr></thead>
+  <tbody>
+    <tr><td>Attestation published</td><td>+2</td></tr>
+    <tr><td>Attestation endorsed by another</td><td>+5 per endorsement</td></tr>
+    <tr><td>Attestation expired cleanly</td><td>+1</td></tr>
+    <tr><td>Dispute upheld against attester</td><td>−20</td></tr>
+    <tr><td>Dispute rejected (attester wins)</td><td>+10</td></tr>
+    <tr><td>Inactivity decay (after 90 days)</td><td>−1% per 30 days (100 bps)</td></tr>
+    <tr><td>Blacklisted</td><td>Score → 0, no publishing</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>5.4 Module Parameters</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>tier2_threshold</code></td><td>100</td><td>Min score for Tier 2</td></tr>
+    <tr><td><code>tier3_threshold</code></td><td>500</td><td>Min score for Tier 3</td></tr>
+    <tr><td><code>decay_start_days</code></td><td>90</td><td>Inactivity days before decay starts</td></tr>
+    <tr><td><code>decay_rate_bps</code></td><td>100</td><td>Decay rate in basis points per 30-day period</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ── 6. x/tatmint ──────────────────────────────────────────────── -->
+<section id="mod-tatmint">
+<h2>6. Module: x/tatmint</h2>
+
+<p>
+  The tatmint module implements a Bitcoin-style halving emission schedule for the
+  native <code>utatst</code> token. At each block, the module computes the current
+  block reward (halved every 2,102,400 blocks), mints that amount, and distributes
+  it to validators via <code>x/distribution</code>.
+</p>
+
+<h3>6.1 MintState</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>current_block_reward</code></td><td>int64</td><td>Current reward in <code>utatst</code> per block</td></tr>
+    <tr><td><code>halving_epoch</code></td><td>uint32</td><td>Number of halvings completed</td></tr>
+    <tr><td><code>total_minted</code></td><td>int64</td><td>Cumulative <code>utatst</code> minted (excl. genesis)</td></tr>
+    <tr><td><code>next_halving_block</code></td><td>int64</td><td>Block height of next halving</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>6.2 Halving Logic</h3>
+<pre><span class="fn">BlockReward</span>(epoch) = InitialBlockReward / 2^epoch
+                   = 10,000,000 / 2^epoch  <span class="cm">// in utatst</span>
+
+<span class="kw">if</span> block_height % HalvingInterval == 0 <span class="kw">&amp;&amp;</span> halving_epoch &lt; MaxHalvings:
+    current_block_reward /= 2
+    halving_epoch += 1
+    next_halving_block += HalvingInterval</pre>
+
+<h3>6.3 Supply Cap Enforcement</h3>
+<p>
+  Before minting each block reward, the keeper checks
+  <code>total_minted + current_block_reward ≤ TotalSupplyCap</code>.
+  Once the cap is reached (<code>1e15 utatst</code>), block rewards cease and the
+  chain operates on transaction fees alone.
+</p>
+
+<section id="module-params">
+<h3>6.4 Module Parameters (all modules)</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Module</th><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="9"><code>x/attestation</code></td><td><code>min_attester_delegation</code></td><td><code>1000000</code></td><td>Min utatst delegation to publish</td></tr>
+    <tr><td><code>min_ttl_seconds</code></td><td>3600</td><td>Minimum TTL (1 hour)</td></tr>
+    <tr><td><code>max_ttl_seconds</code></td><td>31,536,000</td><td>Maximum TTL (365 days)</td></tr>
+    <tr><td><code>max_ttl_ipv4_seconds</code></td><td>7,776,000</td><td>Max IPv4 TTL (90 days)</td></tr>
+    <tr><td><code>max_detection_rules</code></td><td>10</td><td>Max IPFS-linked rules per attestation</td></tr>
+    <tr><td><code>max_attestations_per_epoch</code></td><td>100</td><td>Rate limit per attester per epoch</td></tr>
+    <tr><td><code>dispute_bond_amount</code></td><td><code>10000000</code></td><td>utatst required to open a dispute</td></tr>
+    <tr><td><code>ipv4_min_confidence</code></td><td>60</td><td>Minimum confidence for IPv4 attestations</td></tr>
+    <tr><td><code>timestamp_tolerance_seconds</code></td><td>300</td><td>Max skew between <code>published_at</code> and block time</td></tr>
+    <tr><td rowspan="4"><code>x/reputation</code></td><td><code>tier2_threshold</code></td><td>100</td><td>Score required for Tier 2</td></tr>
+    <tr><td><code>tier3_threshold</code></td><td>500</td><td>Score required for Tier 3</td></tr>
+    <tr><td><code>decay_start_days</code></td><td>90</td><td>Inactivity days before score decay</td></tr>
+    <tr><td><code>decay_rate_bps</code></td><td>100</td><td>Basis points decay per 30d</td></tr>
+    <tr><td rowspan="3"><code>x/ipfsverify</code></td><td><code>min_reports_to_resolve</code></td><td>3</td><td>Validators needed to resolve a job</td></tr>
+    <tr><td><code>verification_window_hours</code></td><td>24</td><td>Hours validators have to report</td></tr>
+    <tr><td><code>reward_per_job</code></td><td><code>1000000</code></td><td>utatst reward per completed verification</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+</section>
+
+<!-- ── 7. x/ipfsverify ───────────────────────────────────────────── -->
+<section id="mod-ipfsverify">
+<h2>7. Module: x/ipfsverify</h2>
+
+<p>
+  The ipfsverify module provides on-chain coordination for verifying IPFS-hosted
+  detection rules. When an attestation references a <code>DetectionRuleRef</code>,
+  the module creates a <code>VerificationJob</code>. Validators that run IPFS nodes
+  fetch the CID, verify the content hash, and submit <code>VerificationReport</code>s.
+  Once <code>min_reports_to_resolve</code> validators agree, the job is resolved and
+  the rule is marked <code>verified = true</code> on the <code>DetectionRuleRef</code>.
+</p>
+
+<h3>7.1 VerificationJob</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>rule_id</code></td><td>string</td><td>Derived rule ID (primary key)</td></tr>
+    <tr><td><code>attestation_id</code></td><td>string</td><td>Parent attestation</td></tr>
+    <tr><td><code>attester</code></td><td>string</td><td>Original attester</td></tr>
+    <tr><td><code>rule_ipfs_cid</code></td><td>string</td><td>CIDv1 to fetch from IPFS</td></tr>
+    <tr><td><code>rule_sha256</code></td><td>string</td><td>Expected SHA-256 of content</td></tr>
+    <tr><td><code>deadline_unix</code></td><td>int64</td><td>Unix timestamp deadline</td></tr>
+    <tr><td><code>status</code></td><td>VerificationJobStatus</td><td>PENDING → CONFIRMED / REJECTED / EXPIRED</td></tr>
+    <tr><td><code>confirming_count</code></td><td>uint32</td><td>Reports with <code>verified=true</code></td></tr>
+    <tr><td><code>rejecting_count</code></td><td>uint32</td><td>Reports with <code>verified=false</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>7.2 Job Resolution Logic</h3>
+<pre><span class="kw">if</span> confirming_count &gt;= min_reports_to_resolve:
+    job.status = CONFIRMED
+    detection_rule.verified = <span class="kw">true</span>
+    <span class="fn">reward_validators</span>(confirming_validators, reward_per_job)
+
+<span class="kw">else if</span> rejecting_count &gt; total_validators/2:
+    job.status = REJECTED
+    detection_rule.verified = <span class="kw">false</span>
+
+<span class="kw">else if</span> block_time &gt; deadline_unix:
+    job.status = EXPIRED</pre>
+</section>
+
+<!-- ── 8. ID DERIVATION ───────────────────────────────────────────── -->
+<section id="id-derivation">
+<h2>8. ID Derivation Formulas</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>ID</th><th>Formula</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>attestation_id</code></td>
+      <td><code>SHA-256("{artifact_sha256}|{attester}|{published_at}")</code></td>
+    </tr>
+    <tr>
+      <td><code>rule_id</code></td>
+      <td><code>SHA-256("{rule_ipfs_cid}|{rule_sha256}")</code></td>
+    </tr>
+    <tr>
+      <td><code>dispute_id</code></td>
+      <td><code>SHA-256("{attestation_id}|{disputer}|{created_at}")</code></td>
+    </tr>
+    <tr>
+      <td>URL artifact hash</td>
+      <td><code>SHA-256(normalize(url))</code> where normalize = lowercase scheme+host, sort query params</td>
+    </tr>
+    <tr>
+      <td>IPv4 artifact hash</td>
+      <td><code>SHA-256(big-endian 4-byte packed IP)</code></td>
+    </tr>
+    <tr>
+      <td>File artifact hash</td>
+      <td><code>SHA-256(raw file bytes)</code></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="icon">⚠</span>
+  <div class="body">
+    <strong>EmptySHA256 is forbidden</strong>
+    The SHA-256 of an empty byte string
+    (<code>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code>)
+    is explicitly rejected by <code>ValidateBasic</code> to prevent accidental
+    attestation of empty/null artefacts.
+  </div>
+</div>
+</section>
+
+<!-- ── 9. CLI REFERENCE ──────────────────────────────────────────── -->
+<section id="cli-attest-file">
+<h2>9. CLI Reference</h2>
+
+<h3>9.1 attest-file — Local file hashing + spec generation</h3>
+
+<pre>threatattestd attest-file &lt;FILE&gt; [FLAGS]</pre>
+
+<p>Computes SHA-256 of a local file, validates parameters, and writes a
+<code>MsgPublishAttestation</code> JSON spec. No network connection required.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>--severity</code></td><td>MEDIUM</td><td>UNSPECIFIED | LOW | MEDIUM | HIGH | CRITICAL</td></tr>
+    <tr><td><code>--confidence</code></td><td>80</td><td>0–100 analyst certainty</td></tr>
+    <tr><td><code>--ttl</code></td><td>86400</td><td>Seconds active (max 2,592,000 = 30d)</td></tr>
+    <tr><td><code>--description</code></td><td>""</td><td>Max 1024 bytes, no HTML tags</td></tr>
+    <tr><td><code>--tags</code></td><td>[]</td><td>Comma-separated tags (max 16)</td></tr>
+    <tr><td><code>--category</code></td><td>[]</td><td>Threat categories (max 8)</td></tr>
+    <tr><td><code>--attester</code></td><td>placeholder</td><td>Bech32 <code>tatst1…</code> address</td></tr>
+    <tr><td><code>--chain-id</code></td><td>threatattest-1</td><td>Chain ID in spec</td></tr>
+    <tr><td><code>--output</code></td><td>attestation.json</td><td>Output JSON path</td></tr>
+    <tr><td><code>--dry-run</code></td><td>false</td><td>Print spec without writing to disk</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h4>Output JSON Schema (AttestationSpec)</h4>
+<pre>{
+  <span class="fld">"schema_version"</span>:  <span class="str">"1.0"</span>,
+  <span class="fld">"artifact_type"</span>:   <span class="str">"FILE"</span>,
+  <span class="fld">"artifact_sha256"</span>: <span class="str">"53aa45cf908f57fa..."</span>,
+  <span class="fld">"severity"</span>:        <span class="str">"HIGH"</span>,
+  <span class="fld">"confidence"</span>:      <span class="num">92</span>,
+  <span class="fld">"ttl_seconds"</span>:     <span class="num">604800</span>,
+  <span class="fld">"description"</span>:    <span class="str">"Ransomware dropper with C2 beaconing"</span>,
+  <span class="fld">"tags"</span>:            [<span class="str">"ransomware"</span>, <span class="str">"dropper"</span>, <span class="str">"c2"</span>],
+  <span class="fld">"threat_category"</span>: [<span class="str">"RANSOMWARE"</span>, <span class="str">"TROJAN"</span>],
+  <span class="fld">"attester"</span>:        <span class="str">"tatst1abc123..."</span>,
+  <span class="fld">"published_at"</span>:    <span class="num">1773521751</span>,
+  <span class="fld">"expires_at"</span>:      <span class="num">1774126551</span>,
+  <span class="fld">"chain_id"</span>:        <span class="str">"threatattest-1"</span>,
+  <span class="fld">"file_size_bytes"</span>: <span class="num">1220</span>,
+  <span class="fld">"file_name"</span>:       <span class="str">"sample_malicious.txt"</span>
+}</pre>
+</section>
+
+<section id="cli-tx">
+<h3>9.2 Transaction Commands</h3>
+
+<h4>tx attestation publish</h4>
+<pre>threatattestd tx attestation publish \
+  --artifact-sha256  <span class="str">"&lt;64-char hex&gt;"</span>       <span class="cm">## required</span>
+  --artifact-type    FILE|URL|IPV4          <span class="cm">## required</span>
+  --severity         HIGH                   <span class="cm">## required</span>
+  --confidence       92                     <span class="cm">## required</span>
+  --ttl              604800                 <span class="cm">## required</span>
+  --description      <span class="str">"..."</span>                 <span class="cm">## optional</span>
+  --tags             <span class="str">"ransomware,dropper"</span>  <span class="cm">## optional</span>
+  --category         <span class="str">"RANSOMWARE,TROJAN"</span>   <span class="cm">## optional</span>
+  --raw-value        <span class="str">"&lt;url-or-ip&gt;"</span>         <span class="cm">## required for URL/IPV4</span>
+  --from             attester               <span class="cm">## required</span>
+  --chain-id         threatattest-1         <span class="cm">## required</span>
+  --fees             500utatst
+  --yes</pre>
+
+<h4>tx attestation endorse</h4>
+<pre>threatattestd tx attestation endorse \
+  --attestation-id  <span class="str">"&lt;attestation_id&gt;"</span>
+  --reason          <span class="str">"Confirmed by independent analysis"</span>
+  --from            second-analyst
+  --chain-id        threatattest-1  --fees 500utatst --yes</pre>
+
+<h4>tx attestation revoke</h4>
+<pre>threatattestd tx attestation revoke \
+  --attestation-id  <span class="str">"&lt;attestation_id&gt;"</span>
+  --reason          <span class="str">"False positive — confirmed benign"</span>
+  --from            attester
+  --chain-id        threatattest-1  --fees 500utatst --yes</pre>
+
+<h4>tx attestation dispute</h4>
+<pre>threatattestd tx attestation dispute \
+  --attestation-id  <span class="str">"&lt;attestation_id&gt;"</span>
+  --ground          FALSE_POSITIVE
+  --evidence        <span class="str">"VirusTotal: 0/72 — ipfs://Qm..."</span>
+  --from            third-party
+  --chain-id        threatattest-1  --fees 500utatst --yes</pre>
+</section>
+
+<section id="cli-query">
+<h3>9.3 Query Commands</h3>
+
+<h4>query attestation is-malicious</h4>
+<pre>threatattestd query attestation is-malicious \
+  --sha256  <span class="str">"53aa45cf908f57fa..."</span>
+  --node    http://127.0.0.1:26657
+  --output  json</pre>
+<p><strong>Response:</strong></p>
+<pre>{
+  <span class="fld">"is_malicious"</span>:       <span class="kw">true</span>,
+  <span class="fld">"attestation_count"</span>:  <span class="num">1</span>,
+  <span class="fld">"highest_severity"</span>:  <span class="str">"HIGH"</span>,
+  <span class="fld">"consensus_score"</span>:   <span class="num">92</span>
+}</pre>
+
+<h4>query attestation get</h4>
+<pre>threatattestd query attestation get \
+  --sha256  <span class="str">"53aa45cf908f57fa..."</span>
+  --node    http://127.0.0.1:26657 --output json</pre>
+
+<h4>query attestation list-by-artifact</h4>
+<pre>threatattestd query attestation list-by-artifact \
+  --sha256  <span class="str">"53aa45cf908f57fa..."</span>
+  --limit   20 --node http://127.0.0.1:26657 --output json</pre>
+</section>
+
+<section id="cli-node">
+<h3>9.4 Node Commands</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Command</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>threatattestd init &lt;moniker&gt; --chain-id …</code></td><td>Initialise node home directory</td></tr>
+    <tr><td><code>threatattestd keys add &lt;name&gt; --keyring-backend test</code></td><td>Create signing key</td></tr>
+    <tr><td><code>threatattestd add-genesis-account &lt;addr&gt; &lt;coins&gt;</code></td><td>Fund genesis account</td></tr>
+    <tr><td><code>threatattestd gentx &lt;key&gt; &lt;amount&gt; --chain-id …</code></td><td>Create genesis validator tx</td></tr>
+    <tr><td><code>threatattestd collect-gentxs</code></td><td>Merge gentxs into genesis.json</td></tr>
+    <tr><td><code>threatattestd validate</code></td><td>Validate genesis file</td></tr>
+    <tr><td><code>threatattestd start</code></td><td>Start the full node</td></tr>
+    <tr><td><code>threatattestd status</code></td><td>Query node status / block height</td></tr>
+    <tr><td><code>threatattestd version --long</code></td><td>Print version information</td></tr>
+    <tr><td><code>threatattestd comet show-node-id</code></td><td>Show p2p node ID</td></tr>
+    <tr><td><code>threatattestd wait-tx --hash …</code></td><td>Wait for tx inclusion</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ── 10. GENESIS ───────────────────────────────────────────────── -->
+<section id="genesis">
+<h2>10. Genesis &amp; Bootstrap</h2>
+
+<h3>10.1 Single-Node Bootstrap (development)</h3>
+<pre><span class="cm"># 1. Init</span>
+threatattestd init my-node --chain-id threatattest-1
+
+<span class="cm"># 2. Create key</span>
+threatattestd keys add attester --keyring-backend test
+ADDR=$(threatattestd keys show attester --keyring-backend test --address)
+
+<span class="cm"># 3. Fund genesis</span>
+threatattestd add-genesis-account $ADDR 10000000utatst --keyring-backend test
+threatattestd gentx attester 1000000utatst --chain-id threatattest-1 --keyring-backend test
+threatattestd collect-gentxs
+threatattestd validate
+
+<span class="cm"># 4. Start</span>
+threatattestd start</pre>
+
+<h3>10.2 Genesis State Modules</h3>
+<p>The genesis JSON includes default state for all modules. Custom parameters can be set before <code>collect-gentxs</code> by editing <code>~/.threatattestd/config/genesis.json</code>.</p>
+
+<div class="callout tip">
+  <span class="icon">✓</span>
+  <div class="body">
+    <strong>Multi-node setup</strong>
+    For a production network, each validator runs <code>gentx</code> independently
+    and submits their file. The chain coordinator collects them with
+    <code>collect-gentxs</code> before distributing the final <code>genesis.json</code>.
+  </div>
+</div>
+</section>
+
+<!-- ── 11. IBC ────────────────────────────────────────────────────── -->
+<section id="ibc">
+<h2>11. IBC Integration</h2>
+
+<p>
+  ThreatAttest supports the Inter-Blockchain Communication protocol (IBC v7).
+  External chains can subscribe to the ThreatAttest threat feed by opening an IBC
+  channel and querying attestation state via the gRPC relayer interface.
+</p>
+
+<div class="card">
+  <h4>Planned IBC Capabilities</h4>
+  <ul>
+    <li>Cross-chain attestation queries via IBC light client proofs</li>
+    <li>Subscription packets: push new attestations to subscriber chains</li>
+    <li>ICS-20 token transfers of <code>utatst</code> across Cosmos chains</li>
+    <li>Interchain accounts for governance delegation</li>
+  </ul>
+</div>
+</section>
+
+<!-- ── 12. PORTS ─────────────────────────────────────────────────── -->
+<section id="ports">
+<h2>12. Ports &amp; Endpoints</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Port</th><th>Protocol</th><th>Purpose</th><th>Default Bind</th></tr></thead>
+  <tbody>
+    <tr><td><strong>26656</strong></td><td>TCP</td><td>CometBFT p2p (peer connections)</td><td>0.0.0.0:26656</td></tr>
+    <tr><td><strong>26657</strong></td><td>TCP/HTTP</td><td>CometBFT RPC (CLI, status, tx broadcast)</td><td>127.0.0.1:26657</td></tr>
+    <tr><td><strong>26660</strong></td><td>TCP/HTTP</td><td>Prometheus metrics</td><td>localhost:26660</td></tr>
+    <tr><td><strong>9090</strong></td><td>TCP</td><td>Cosmos SDK gRPC</td><td>localhost:9090</td></tr>
+    <tr><td><strong>9091</strong></td><td>TCP/HTTP</td><td>gRPC-Gateway (REST over gRPC)</td><td>localhost:9091</td></tr>
+    <tr><td><strong>1317</strong></td><td>TCP/HTTP</td><td>Legacy Cosmos REST API</td><td>localhost:1317</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<!-- ── 13. SECURITY ──────────────────────────────────────────────── -->
+<section id="security">
+<h2>13. Security Model</h2>
+
+<h3>13.1 Sybil Resistance</h3>
+<p>
+  Publishing attestations requires both a minimum staking delegation
+  (<code>min_attester_delegation</code>, default 1 TATST) and a minimum reputation
+  score. New addresses start at score 0 and cannot publish until they meet the
+  threshold, which requires earning reputation through other means (or receiving
+  a genesis allocation).
+</p>
+
+<h3>13.2 Rate Limiting</h3>
+<p>
+  Each attester is limited to <code>max_attestations_per_epoch</code> (default 100)
+  attestations per 1,800-block epoch (~1 hour). This prevents bulk-submission spam
+  while allowing high-throughput legitimate use.
+</p>
+
+<h3>13.3 Timestamp Validation</h3>
+<p>
+  The <code>published_at</code> field must be within
+  <code>timestamp_tolerance_seconds</code> (default 300 seconds = 5 minutes) of the
+  block timestamp. This prevents replay attacks using old attestation payloads.
+</p>
+
+<h3>13.4 IPv4 Attestation Guard</h3>
+<p>
+  IPv4 addresses within IANA reserved ranges (loopback 127.0.0.0/8,
+  private 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, link-local 169.254.0.0/16,
+  multicast 224.0.0.0/4, broadcast 255.255.255.255) are rejected to prevent
+  attestations of internal infrastructure.
+</p>
+
+<h3>13.5 Dispute Bond</h3>
+<p>
+  Filing a dispute requires locking <code>dispute_bond_amount</code> (default 10
+  TATST) from the challenger's account. This bond is returned if the dispute is
+  upheld, or burned if rejected. This discourages frivolous disputes while
+  preserving the ability to challenge false attestations.
+</p>
+
+<h3>13.6 Key File Security</h3>
+<div class="callout danger">
+  <span class="icon">🔒</span>
+  <div class="body">
+    <strong>Protect your validator key</strong>
+    <code>~/.threatattestd/config/priv_validator_key.json</code> controls block
+    signing. If this key is compromised, the validator can be double-sign slashed
+    and tombstoned. Store it in a HSM or encrypted volume in production.
+  </div>
+</div>
+
+<h3>13.7 Error Code Reference</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Code</th><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td><code>ErrInvalidArtifactType</code></td><td>artifact_type is UNSPECIFIED</td></tr>
+    <tr><td>3</td><td><code>ErrInvalidSHA256</code></td><td>Not a valid 64-char hex SHA-256</td></tr>
+    <tr><td>4</td><td><code>ErrTimestampSkew</code></td><td>published_at outside tolerance window</td></tr>
+    <tr><td>5</td><td><code>ErrTTLOutOfRange</code></td><td>TTL below min or above max</td></tr>
+    <tr><td>6</td><td><code>ErrInvalidConfidence</code></td><td>Confidence not in 0–100</td></tr>
+    <tr><td>9</td><td><code>ErrDescriptionTooLong</code></td><td>Description exceeds 1024 bytes</td></tr>
+    <tr><td>10</td><td><code>ErrHTMLNotAllowed</code></td><td>HTML tags detected in description</td></tr>
+    <tr><td>11</td><td><code>ErrInsufficientDelegation</code></td><td>Attester below min delegation threshold</td></tr>
+    <tr><td>12</td><td><code>ErrReservedIPv4</code></td><td>IPv4 is in an IANA reserved range</td></tr>
+    <tr><td>15</td><td><code>ErrInvalidCID</code></td><td>Not a valid CIDv1 string</td></tr>
+    <tr><td>19</td><td><code>ErrRateLimitExceeded</code></td><td>Attester rate limit exceeded</td></tr>
+    <tr><td>20</td><td><code>ErrAttestationNotFound</code></td><td>No attestation for this ID</td></tr>
+    <tr><td>22</td><td><code>ErrSelfEndorse</code></td><td>Endorser is original attester</td></tr>
+    <tr><td>23</td><td><code>ErrAlreadyEndorsed</code></td><td>Already endorsed by this address</td></tr>
+    <tr><td>27</td><td><code>ErrUnauthorizedRevoke</code></td><td>Only original attester may revoke</td></tr>
+    <tr><td>33</td><td><code>ErrInvalidAttesterAddress</code></td><td>Invalid bech32 address</td></tr>
+    <tr><td>38</td><td><code>ErrSHA256Mismatch</code></td><td>artifact_sha256 ≠ sha256(raw_value)</td></tr>
+    <tr><td>41</td><td><code>ErrSelfDispute</code></td><td>Attester cannot dispute own attestation</td></tr>
+    <tr><td>44</td><td><code>ErrDuplicateAttestation</code></td><td>Identical active attestation exists</td></tr>
+  </tbody>
+</table>
+</div>
+</section>
+
+<hr>
+
+<p style="color: var(--text2); font-size:0.78rem; text-align:center; margin-top:2rem;">
+  ThreatAttest v0.1.0 · Cosmos SDK v0.50.9 · CometBFT v0.38.9 · Go 1.22 ·
+  <a href="README.md">README</a> · <a href="MANPAGE.md">MANPAGE</a>
+</p>
+
+</main>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('section[id], div[id]');
+  const navLinks = document.querySelectorAll('nav#sidebar a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(link => link.classList.remove('active'));
+        const active = document.querySelector(`nav#sidebar a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

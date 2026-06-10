@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest — DNS-Pinned Signer Identity Proposal</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2128;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --accent:    #58a6ff;
+    --accent2:   #79c0ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --orange:    #f0883e;
+    --red:       #f85149;
+    --purple:    #bc8cff;
+    --teal:      #39d353;
+    --link:      #58a6ff;
+    --code-bg:   #161b22;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ─── Layout ─── */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 270px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: sticky; top: 0; height: 100vh;
+    overflow-y: auto; padding: 24px 0;
+  }
+  .sidebar-logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .sidebar-logo .logo-icon { font-size: 28px; }
+  .sidebar-logo .logo-title { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  .sidebar-logo .logo-sub   { font-size: 11px; color: var(--muted); }
+
+  .nav-section { margin-bottom: 8px; }
+  .nav-section-title {
+    padding: 4px 20px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted);
+  }
+  .nav-link {
+    display: block; padding: 6px 20px;
+    font-size: 13px; color: var(--muted);
+    text-decoration: none; border-left: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .nav-link:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-link.active { color: var(--accent); border-left-color: var(--accent); background: rgba(88,166,255,0.08); }
+
+  /* Main content */
+  .main { flex: 1; max-width: 900px; padding: 48px 56px; }
+
+  /* ─── Typography ─── */
+  h1 { font-size: 32px; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.2; }
+  h2 { font-size: 22px; font-weight: 700; color: var(--text); margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 17px; font-weight: 600; color: var(--accent2); margin: 28px 0 12px; }
+  h4 { font-size: 14px; font-weight: 700; color: var(--text); margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  p  { margin-bottom: 14px; color: var(--text); }
+  a  { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .lead {
+    font-size: 17px; color: var(--muted); margin-bottom: 32px;
+    border-left: 3px solid var(--accent); padding-left: 16px; line-height: 1.6;
+  }
+
+  /* ─── Code ─── */
+  code {
+    background: var(--code-bg); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+    font-size: 13px; color: #e8912d;
+  }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none; border: none; padding: 0; color: var(--text); font-size: 13px;
+  }
+  .comment { color: #6e7681; }
+  .kw      { color: #ff7b72; }
+  .str     { color: #a5d6ff; }
+  .val     { color: #79c0ff; }
+  .label   { color: var(--green); }
+  .hl      { color: var(--orange); }
+
+  /* ─── Tables ─── */
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 16px 0 24px; font-size: 13px;
+  }
+  th {
+    background: var(--surface2); text-align: left;
+    padding: 10px 14px; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--muted); border: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px; border: 1px solid var(--border);
+    vertical-align: top; color: var(--text); font-size: 13px;
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ─── Callout boxes ─── */
+  .callout {
+    border-radius: 8px; padding: 16px 20px; margin: 20px 0;
+    border-left: 4px solid; font-size: 14px;
+  }
+  .callout-title { font-weight: 700; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .callout.info    { background: #1b2b3d; border-color: var(--accent);  }
+  .callout.info .callout-title  { color: var(--accent); }
+  .callout.warn    { background: #2d2008; border-color: var(--yellow); }
+  .callout.warn .callout-title  { color: var(--yellow); }
+  .callout.danger  { background: #2d1117; border-color: var(--red);    }
+  .callout.danger .callout-title{ color: var(--red); }
+  .callout.success { background: #0f2719; border-color: var(--green);  }
+  .callout.success .callout-title{ color: var(--green); }
+
+  /* ─── Badges ─── */
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px;
+    vertical-align: middle; margin-left: 6px;
+  }
+  .badge-rfc     { background: #1f3051; color: #79c0ff; }
+  .badge-new     { background: #1b3a1b; color: #3fb950; }
+  .badge-critical{ background: #3d1117; color: #f85149; }
+  .badge-req     { background: #2d2008; color: #d29922; }
+
+  /* ─── Diagram boxes ─── */
+  .diagram {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 12.5px; line-height: 1.8;
+    overflow-x: auto; margin: 20px 0;
+    white-space: pre;
+    color: var(--text);
+  }
+
+  /* ─── Section header strips ─── */
+  .section-tag {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 3px 10px; border-radius: 4px; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .tag-dns  { background: #1b2b3d; color: var(--accent2); }
+  .tag-crypto { background: #2d1a3d; color: var(--purple); }
+  .tag-chain  { background: #1b3a1b; color: var(--green); }
+  .tag-ops    { background: #2d2008; color: var(--yellow); }
+  .tag-sec    { background: #3d1117; color: var(--red); }
+
+  /* ─── Field definition lists ─── */
+  .field-list { margin: 12px 0 20px; }
+  .field-item {
+    display: flex; gap: 12px; padding: 8px 0;
+    border-bottom: 1px solid var(--border); font-size: 13px;
+    align-items: flex-start;
+  }
+  .field-name  { color: #e8912d; font-family: monospace; min-width: 180px; flex-shrink: 0; font-size: 12px; margin-top: 2px; }
+  .field-desc  { color: var(--text); }
+  .field-req   { color: var(--red); font-size: 11px; font-weight: 700; margin-top: 2px; }
+
+  /* ─── Step list ─── */
+  .steps { counter-reset: step; margin: 20px 0; }
+  .step {
+    counter-increment: step;
+    display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start;
+  }
+  .step-num {
+    width: 32px; height: 32px; flex-shrink: 0;
+    background: var(--accent); color: #0d1117;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; margin-top: 2px;
+  }
+  .step-body { flex: 1; }
+  .step-title { font-weight: 700; font-size: 15px; margin-bottom: 6px; color: var(--text); }
+
+  /* Horizontal rule */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* Header meta strip */
+  .meta-strip {
+    display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 32px;
+    padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .meta-item { font-size: 12px; color: var(--muted); }
+  .meta-item strong { color: var(--text); }
+
+  /* Two-column grid */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+  .col-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+  }
+  .col-card h4 { margin-top: 0; }
+
+  /* Comparison table highlight */
+  .rec { color: var(--green); font-weight: 700; }
+  .alt { color: var(--muted); }
+
+  /* TOC page marker */
+  .page-anchor { display: block; margin-top: -80px; padding-top: 80px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ═══════════════════════════════════════════════════════════
+     SIDEBAR
+════════════════════════════════════════════════════════════ -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🔏</div>
+    <div class="logo-title">ThreatAttest</div>
+    <div class="logo-sub">DNS-Pinned Signer Identity</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title">Overview</div>
+    <a class="nav-link active" href="#abstract">Abstract</a>
+    <a class="nav-link" href="#motivation">Motivation</a>
+    <a class="nav-link" href="#prior-art">Prior Art & Standards</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Design</div>
+    <a class="nav-link" href="#dns-records">DNS Record Schema</a>
+    <a class="nav-link" href="#dnssec">DNSSEC Requirements</a>
+    <a class="nav-link" href="#key-types">Key Types</a>
+    <a class="nav-link" href="#identity-binding">Identity Binding</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Protocol</div>
+    <a class="nav-link" href="#registration">Registration Flow</a>
+    <a class="nav-link" href="#verification">Verification Flow</a>
+    <a class="nav-link" href="#rotation">Key Rotation</a>
+    <a class="nav-link" href="#revocation">Revocation</a>
+    <a class="nav-link" href="#cross-pin">Cross-Chain Pinning</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">On-Chain Changes</div>
+    <a class="nav-link" href="#chain-integration">Chain Integration</a>
+    <a class="nav-link" href="#msg-changes">Message Changes</a>
+    <a class="nav-link" href="#keeper-changes">Keeper Changes</a>
+    <a class="nav-link" href="#trust-delta">Trust Score Delta</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Security</div>
+    <a class="nav-link" href="#threat-model">Threat Model</a>
+    <a class="nav-link" href="#attack-vectors">Attack Vectors</a>
+    <a class="nav-link" href="#mitigations">Mitigations</a>
+  </div>
+  <div class="nav-section">
+    <div class="nav-section-title">Operations</div>
+    <a class="nav-link" href="#dns-setup">DNS Setup Guide</a>
+    <a class="nav-link" href="#tooling">Tooling</a>
+    <a class="nav-link" href="#compliance">Compliance Tiers</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════════════════ -->
+<main class="main">
+
+<!-- ─── Title ─── -->
+<span class="section-tag tag-dns">Proposal · v1.0</span>
+<h1>DNS-Pinned Signer Identity for ThreatAttest</h1>
+
+<div class="meta-strip">
+  <div class="meta-item">Status: <strong>Draft Proposal</strong></div>
+  <div class="meta-item">Standards: <strong>RFC 4033/4034/4035, RFC 6698, RFC 7929, did:dns</strong></div>
+  <div class="meta-item">Key type: <strong>secp256k1 (Cosmos-native)</strong></div>
+  <div class="meta-item">DNS RR: <strong>TXT + URI (DNSSEC-signed)</strong></div>
+</div>
+
+<p class="lead">
+  This document proposes a method for cryptographically binding a ThreatAttest blockchain signer's
+  identity to their DNS domain, secured with DNSSEC. The design draws on DKIM (RFC 6376),
+  DANE/OPENPGPKEY (RFC 6698, 7929), SSHFP (RFC 4255), and the W3C <code>did:dns</code> method
+  to create a robust, auditable, and rotatable identity anchor that the on-chain keeper can
+  verify at publish time.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="abstract"></span>
+<h2>1. Abstract</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<p>
+  A ThreatAttest attester currently proves control of a Cosmos address through the standard
+  transaction-level secp256k1 signature and an additional message-level <code>attester_sig</code>.
+  However, nothing in the current design verifiably links that address to a real-world organisational
+  identity. An adversary can generate any number of fresh keypairs and publish attestations without
+  any accountability anchor beyond on-chain reputation score.
+</p>
+<p>
+  This proposal adds a <strong>DNS identity layer</strong>: an attester publishes their secp256k1
+  public key (compressed, hex-encoded) in a DNSSEC-signed TXT record under a well-known sub-label
+  of their domain. The on-chain keeper, or any off-chain verifier, can then:
+</p>
+<ol style="margin: 0 0 16px 24px; line-height: 2;">
+  <li>Resolve the DNS record (requiring DNSSEC validation to succeed)</li>
+  <li>Verify that the public key in DNS matches the one used to produce <code>attester_sig</code></li>
+  <li>Confirm the domain is the same one recorded in the attestation's optional <code>attester_domain</code> field</li>
+  <li>Award a <strong>DNS-pinned trust bonus</strong> to the attestation's computed trust score</li>
+</ol>
+<p>
+  The result is a three-anchor identity model: <strong>on-chain address + message signature +
+  DNS-pinned public key</strong>, making Sybil attacks and key spoofing significantly harder.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="motivation"></span>
+<h2>2. Motivation</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>🔴 Current Problems</h4>
+    <p style="font-size:13px;">An attester's on-chain identity is pseudonymous — a bare Cosmos address.
+    Anyone can generate a fresh keypair, acquire minimal TATST delegation (bypassing reputation
+    gate), and begin publishing attestations with no accountability. A compromised or
+    colluding attester is only punished retroactively via disputes.</p>
+  </div>
+  <div class="col-card">
+    <h4>🟢 DNS Pinning Provides</h4>
+    <p style="font-size:13px;">Domain ownership is a real-world accountability anchor — it costs
+    money, leaves WHOIS records, and is logged by certificate transparency. A DNSSEC-signed key
+    pin ties the attester's signing key to their internet identity, creating an auditable,
+    rotatable, publicly inspectable record that cannot be forged without controlling the DNS zone.</p>
+  </div>
+</div>
+
+<p>
+  The core insight borrowed from <strong>DKIM</strong> (RFC 6376) is that a public key published
+  in DNS, under a domain the organisation controls, is self-certifying: the act of publishing it
+  proves domain control, and DNSSEC proves the record hasn't been tampered with in transit.
+  Applied to blockchain attesters, this gives consumers of threat intelligence a way to evaluate
+  not just <em>how much</em> an attester has staked, but <em>who they are</em>.
+</p>
+
+<div class="callout info">
+  <div class="callout-title">ℹ️ Design Philosophy</div>
+  DNS pinning is intentionally not a hard requirement for publishing attestations. It is a
+  voluntary signal that earns an on-chain trust bonus and unlocks higher reputation tiers. This
+  preserves permissionless participation while incentivising accountability.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="prior-art"></span>
+<h2>3. Prior Art & Relevant Standards</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<table>
+  <tr>
+    <th>Standard</th>
+    <th>RFC / Spec</th>
+    <th>What it does</th>
+    <th>What we borrow</th>
+  </tr>
+  <tr>
+    <td><strong>DKIM</strong></td>
+    <td><span class="badge badge-rfc">RFC 6376</span></td>
+    <td>Associates email signing keys with DNS domains via TXT records under <code>_domainkey</code></td>
+    <td>Sub-label naming pattern (<code>_selector._domainkey</code>), p= field for base64 public key, key rollover via selectors</td>
+  </tr>
+  <tr>
+    <td><strong>DANE/TLSA</strong></td>
+    <td><span class="badge badge-rfc">RFC 6698</span></td>
+    <td>Pins TLS certificates to DNS via TLSA records under <code>_port._proto</code></td>
+    <td>DNSSEC requirement for all resolutions, certificate usage + matching type fields</td>
+  </tr>
+  <tr>
+    <td><strong>OPENPGPKEY</strong></td>
+    <td><span class="badge badge-rfc">RFC 7929</span></td>
+    <td>Publishes OpenPGP public keys in DNS for email address lookup</td>
+    <td>Hash-based sub-label (SHA-256 of local-part), DNSSEC-only validation, key update = DNS update</td>
+  </tr>
+  <tr>
+    <td><strong>SSHFP</strong></td>
+    <td><span class="badge badge-rfc">RFC 4255</span></td>
+    <td>Stores SSH host key fingerprints in DNS for host authentication</td>
+    <td>Algorithm + fingerprint type fields; strict DNSSEC requirement before trusting the record</td>
+  </tr>
+  <tr>
+    <td><strong>did:dns</strong></td>
+    <td>W3C CCG</td>
+    <td>DID method that uses DNS URI records to publish verifiable keys for a domain</td>
+    <td>URI RR pattern <code>_key1._did.example.com IN URI … "did:key:z…"</code>; DID document structure</td>
+  </tr>
+  <tr>
+    <td><strong>DNSSEC</strong></td>
+    <td><span class="badge badge-rfc">RFC 4033–4035</span></td>
+    <td>Cryptographically signs DNS zones; provides data origin authentication and denial of existence</td>
+    <td>RRSIG validation requirement; NSEC3 for zone walking protection; KSK/ZSK key management</td>
+  </tr>
+</table>
+
+<h3>Design Decision: TXT vs URI vs TLSA record type</h3>
+<p>
+  We evaluated three DNS RR types for carrying the attester public key:
+</p>
+<table>
+  <tr><th>RR Type</th><th>Pros</th><th>Cons</th><th>Decision</th></tr>
+  <tr>
+    <td><strong>TXT</strong></td>
+    <td>Universal support; human-readable; matches DKIM precedent exactly; no new RR type needed; easy to add with any DNS provider</td>
+    <td>No structured format; limited to 255 bytes per string (use multiple strings); no native IANA field semantics</td>
+    <td><span class="rec">✅ PRIMARY</span></td>
+  </tr>
+  <tr>
+    <td><strong>URI</strong></td>
+    <td>Structured (priority, weight, target); used by did:dns; forward-compatible with DID resolution</td>
+    <td>Poor support in hosted DNS providers; resolver libraries less mature; priority/weight semantics not needed here</td>
+    <td><span class="alt">Secondary (DID compat layer)</span></td>
+  </tr>
+  <tr>
+    <td><strong>TLSA</strong></td>
+    <td>IANA-standardized for DANE; selector and matching type fields</td>
+    <td>Designed for X.509/PKIX; secp256k1 raw keys don't map cleanly; port/protocol semantics irrelevant</td>
+    <td><span class="alt">Not recommended</span></td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="dns-records"></span>
+<h2>4. DNS Record Schema</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-dns">DNS</span>
+<h3>4.1 Primary TXT Record — Attester Key Pin</h3>
+
+<p>
+  Modelled directly after DKIM's selector mechanism (RFC 6376 §3.6.1). The record owner is
+  an attester-controlled domain. A <em>selector</em> (analogous to DKIM's key rollover mechanism)
+  allows multiple keys to coexist during rotation.
+</p>
+
+<h4>Record Name Format</h4>
+<pre><code><span class="label">{selector}</span>._tatkey.<span class="label">{domain}</span>.
+
+Example:
+<span class="str">v1._tatkey.threatintel.example.com.      IN TXT  "…"</span>
+<span class="str">v2._tatkey.threatintel.example.com.      IN TXT  "…"</span>    <span class="comment">; during rotation</span>
+<span class="str">active._tatkey.threatintel.example.com.  IN CNAME v1._tatkey.threatintel.example.com.</span></code></pre>
+
+<h4>TXT Record Field Format</h4>
+<p>
+  Fields are semicolon-separated key=value pairs, exactly matching DKIM's style (RFC 6376 §3.6.1).
+  DNS TXT records may split content across multiple strings (each ≤255 bytes); verifiers MUST
+  concatenate all strings before parsing.
+</p>
+<pre><code><span class="str">v1._tatkey.threatintel.example.com. 300 IN TXT (
+    "v=TAT1; "
+    "k=secp256k1; "
+    "p=02a1b2c3d4e5f6...64hexchars...; "
+    "a=cosmos1abc...xyz; "
+    "n=ThreatIntel Example Corp; "
+    "t=1710000000; "
+    "exp=1741536000; "
+    "h=sha256; "
+    "flags=y"
+)</span></code></pre>
+
+<h4>Field Definitions</h4>
+<div class="field-list">
+  <div class="field-item">
+    <div class="field-name">v=TAT1</div>
+    <div>
+      <div class="field-desc">Version tag. MUST be <code>TAT1</code>. Records with unknown versions MUST be ignored.</div>
+      <div class="field-req">REQUIRED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">k=secp256k1</div>
+    <div>
+      <div class="field-desc">Key algorithm. Currently only <code>secp256k1</code> is defined (matching Cosmos SDK / ThreatAttest native key type). Reserved future values: <code>ed25519</code>, <code>p256</code>.</div>
+      <div class="field-req">REQUIRED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">p={pubkey}</div>
+    <div>
+      <div class="field-desc">Compressed secp256k1 public key, lowercase hex-encoded (66 characters = 33 bytes). This is the same key whose corresponding private key signs <code>attester_sig</code> in <code>MsgPublishAttestation</code>. If this field is empty (<code>p=</code>), the key is considered <strong>revoked</strong>.</div>
+      <div class="field-req">REQUIRED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">a={cosmos-addr}</div>
+    <div>
+      <div class="field-desc">The bech32 Cosmos address (<code>cosmos1…</code>) derived from this key. Verifiers confirm that <code>SHA256(RIPEMD160(pubkey)) == decode(a)</code>. This cross-links the DNS record to the on-chain address explicitly.</div>
+      <div class="field-req">REQUIRED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">n={display-name}</div>
+    <div>
+      <div class="field-desc">Human-readable organisation or individual name. ASCII only, max 64 characters. Optional but strongly recommended for organisations.</div>
+      <div class="field-req">OPTIONAL</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">t={unix-timestamp}</div>
+    <div>
+      <div class="field-desc">Unix timestamp of key publication. Allows verifiers to detect clock-skew attacks. The keeper enforces that <code>t</code> is within ±24h of the block time when verifying.</div>
+      <div class="field-req">RECOMMENDED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">exp={unix-timestamp}</div>
+    <div>
+      <div class="field-desc">Key expiry timestamp. Verifiers MUST reject records where <code>exp</code> is in the past. If omitted, default expiry is 1 year from <code>t</code>.</div>
+      <div class="field-req">RECOMMENDED</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">h=sha256</div>
+    <div>
+      <div class="field-desc">Hash algorithm used when computing the attester signature payload digest. Currently only <code>sha256</code> is supported.</div>
+      <div class="field-req">OPTIONAL (default: sha256)</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">flags=y</div>
+    <div>
+      <div class="field-desc">Colon-separated flags. Defined values: <code>y</code> = testing / do not enforce, <code>s</code> = strict (fail-closed if DNS unavailable), <code>r</code> = rotation in progress (old key still valid). Example: <code>flags=s:r</code></div>
+      <div class="field-req">OPTIONAL</div>
+    </div>
+  </div>
+  <div class="field-item">
+    <div class="field-name">prev={selector}</div>
+    <div>
+      <div class="field-desc">Selector of the previous (now superseded) key. Used during rotation so verifiers can find the old key to verify older attestations signed with it.</div>
+      <div class="field-req">OPTIONAL (during rotation)</div>
+    </div>
+  </div>
+</div>
+
+<h3>4.2 Active Selector Pointer Record</h3>
+<p>
+  To allow off-chain tools to discover the current key without knowing the selector, a stable
+  CNAME (or TXT pointer) MUST point to the active selector:
+</p>
+<pre><code><span class="comment">; Stable name — verifiers resolve this first</span>
+<span class="str">active._tatkey.example.com.  300  IN CNAME  v1._tatkey.example.com.</span>
+
+<span class="comment">; Or as a TXT pointer if CNAME at non-apex is problematic:</span>
+<span class="str">_tatkey.example.com.  300  IN TXT  "active=v1"</span></code></pre>
+
+<h3>4.3 Domain Verification Proof Record</h3>
+<p>
+  To prove that the DNS record was published by the same entity who controls the Cosmos private key
+  (and not an adversary who hijacked the DNS zone), the attester MUST publish a
+  <strong>domain verification proof</strong>: a signature over the domain name, made with the
+  same secp256k1 private key.
+</p>
+<pre><code><span class="comment">; Proof record — the attester signs their own domain name</span>
+<span class="str">_tatproof.example.com.  300  IN TXT  (
+    "v=TAT1; "
+    "proof=<hex-secp256k1-sig-of-sha256(domain-name)>; "
+    "sel=v1"
+)</span></code></pre>
+
+<p>The signed payload for the domain verification proof is:</p>
+<pre><code><span class="comment">// Payload = SHA-256 of: "tatkey-domain-proof|{domain}|{selector}|{cosmos-address}"
+// e.g.: "tatkey-domain-proof|example.com|v1|cosmos1abc...xyz"</span>
+payload = SHA256(<span class="str">"tatkey-domain-proof|" + domain + "|" + selector + "|" + cosmosAddr</span>)</code></pre>
+
+<div class="callout success">
+  <div class="callout-title">✅ Why This Matters</div>
+  Without the proof record, a third party who controls a domain could copy someone else's public
+  key into their own <code>_tatkey</code> TXT record. The proof record requires the private key
+  to sign the specific domain name, making it impossible to copy without the key.
+</div>
+
+<h3>4.4 Optional: URI Record (did:dns Compatible)</h3>
+<p>
+  For forward-compatibility with the W3C <code>did:dns</code> ecosystem and DIF Universal Resolver:
+</p>
+<pre><code><span class="comment">; did:dns compatible URI record</span>
+<span class="str">_key1._did.example.com.  300  IN URI  100 10  "did:key:zQ3sh..."</span>
+
+<span class="comment">; Where "did:key:zQ3sh..." is the secp256k1 key encoded as a did:key multibase string
+; Algorithm prefix for secp256k1: 0xe7 (varint) → multibase base58btc → "zQ3s..."</span></code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="dnssec"></span>
+<h2>5. DNSSEC Requirements</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-sec">Security</span>
+<div class="callout danger">
+  <div class="callout-title">🔴 Hard Requirement</div>
+  All DNS-based identity claims in ThreatAttest MUST be protected by DNSSEC. A record that
+  cannot be DNSSEC-validated MUST be treated as absent. Without DNSSEC, an attacker on the
+  network path can inject arbitrary TXT records, defeating the entire identity-pinning scheme.
+</div>
+
+<h3>5.1 DNSSEC Validation Chain</h3>
+<div class="diagram">
+Root (.)
+  └── DNSKEY (KSK) + DS record  ← Trust anchor (IANA / browser/OS built-in)
+      └── com. / org. / net. / …
+          └── DNSKEY (ZSK)
+              └── example.com.
+                  ├── DNSKEY (ZSK for zone)
+                  ├── RRSIG for _tatkey TXT record  ← Must be VALID
+                  ├── RRSIG for _tatproof TXT record ← Must be VALID
+                  └── NSEC3 records  ← Prevents zone walking</div>
+
+<h3>5.2 Validation Algorithm</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Query with DNSSEC (DO bit set)</div>
+      <p>The verifier MUST use a DNSSEC-validating resolver (e.g. Unbound, Google 8.8.8.8 with EDNS0 DO flag, Cloudflare 1.1.1.1). The DNS response MUST include RRSIG records for all relevant RRsets.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Validate RRSIG over TXT RRset</div>
+      <p>Verify the RRSIG signature covering the TXT RRset at <code>{selector}._tatkey.{domain}</code>. The RRSIG must chain up to a trusted DS record. The validation status MUST be <strong>SECURE</strong> (RFC 4035 §4.3).</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Check denial of existence with NSEC/NSEC3</div>
+      <p>If the record does not exist, NSEC3 records (preferred over NSEC to prevent zone walking) MUST provide authenticated denial of existence. A missing record MUST be treated as identity not pinned.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">Verify RRSIG expiry</div>
+      <p>RRSIG records have an <code>Signature Expiration</code> field. The verifier MUST check this against current wall-clock time. An expired RRSIG MUST be rejected even if cryptographically valid.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <div class="step-title">Parse and validate TXT field content</div>
+      <p>Only after DNSSEC validation passes, parse the TXT record fields. Verify: <code>v=TAT1</code>, <code>k=secp256k1</code>, <code>p=</code> not empty, <code>exp</code> not in past, cosmos address derivation check.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <div class="step-title">Verify domain proof signature</div>
+      <p>Fetch <code>_tatproof.{domain}</code>. Verify the secp256k1 signature in <code>proof=</code> against <code>SHA256("tatkey-domain-proof|{domain}|{selector}|{cosmosAddr}")</code>. This confirms the key owner controls both the DNS zone and the private key.</p>
+    </div>
+  </div>
+</div>
+
+<h3>5.3 DNSSEC Algorithm Requirements</h3>
+<table>
+  <tr><th>Algorithm</th><th>IANA #</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>ECDSAP256SHA256</td><td>13</td><td><span class="rec">✅ RECOMMENDED</span></td><td>Fast, widely supported, compact signatures. Preferred for new deployments.</td></tr>
+  <tr><td>ECDSAP384SHA384</td><td>14</td><td><span class="alt">Acceptable</span></td><td>Higher security margin; larger keys/signatures.</td></tr>
+  <tr><td>ED25519</td><td>15</td><td><span class="alt">Acceptable</span></td><td>Modern, fast; not yet supported by all authoritative servers.</td></tr>
+  <tr><td>RSASHA256</td><td>8</td><td><span class="alt">Legacy acceptable</span></td><td>Widely deployed; acceptable for existing zones. RSA-2048 minimum.</td></tr>
+  <tr><td>RSASHA1</td><td>5</td><td><span class="badge badge-critical">REJECTED</span></td><td>SHA-1 deprecated. MUST NOT be used.</td></tr>
+  <tr><td>DSA</td><td>3</td><td><span class="badge badge-critical">REJECTED</span></td><td>Deprecated.</td></tr>
+</table>
+
+<h3>5.4 DNS Transport Security</h3>
+<p>
+  DNSSEC provides data origin authentication but does not encrypt the transport. The following
+  transports MUST be used for verifier-to-resolver communication to prevent passive monitoring:
+</p>
+<table>
+  <tr><th>Transport</th><th>Standard</th><th>Requirement</th></tr>
+  <tr><td>DNS over TLS (DoT)</td><td>RFC 7858, port 853</td><td><span class="rec">RECOMMENDED</span> for node-based verifiers</td></tr>
+  <tr><td>DNS over HTTPS (DoH)</td><td>RFC 8484, HTTPS</td><td><span class="rec">RECOMMENDED</span> for browser-based verifiers</td></tr>
+  <tr><td>DNS over QUIC (DoQ)</td><td>RFC 9250</td><td>Optional, emerging</td></tr>
+  <tr><td>Plain UDP/TCP port 53</td><td>RFC 1035</td><td>Only if DNSSEC validation is local</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="key-types"></span>
+<h2>6. Key Types & Encoding</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-crypto">Cryptography</span>
+<h3>6.1 secp256k1 — Native ThreatAttest Key</h3>
+<p>
+  ThreatAttest (Cosmos SDK) uses secp256k1 natively. The same key pair that signs Cosmos
+  transactions signs the <code>attester_sig</code> payload. The DNS TXT record therefore carries
+  the <strong>identical</strong> public key — no secondary key management is required.
+</p>
+<pre><code><span class="comment">// Compressed secp256k1 public key: 33 bytes = 66 hex chars
+// Prefix 0x02 (y even) or 0x03 (y odd), followed by 32 bytes x-coordinate</span>
+p=<span class="str">02a4b5c6d7e8f9001122334455667788990011223344556677889900aabbccddeeff01</span>
+
+<span class="comment">// Cosmos address derivation (for cross-validation in field a=):
+// 1. SHA-256(compressed_pubkey) → 32 bytes
+// 2. RIPEMD-160(sha256_result) → 20 bytes
+// 3. bech32 encode with prefix "cosmos" → cosmos1...</span></code></pre>
+
+<h3>6.2 Key Encoding in DNS TXT</h3>
+<p>
+  We evaluated three encodings for the <code>p=</code> field:
+</p>
+<table>
+  <tr><th>Encoding</th><th>Length for 33 bytes</th><th>Readability</th><th>Decision</th></tr>
+  <tr><td>Hex (lowercase)</td><td>66 chars</td><td>Easy to inspect, copy, compare</td><td><span class="rec">✅ RECOMMENDED</span> — matches existing <code>attester_sig</code> convention in ThreatAttest</td></tr>
+  <tr><td>Base64 (standard)</td><td>48 chars (+ padding)</td><td>Compact; familiar from TLS/PGP</td><td>Acceptable alternative</td></tr>
+  <tr><td>Base58</td><td>~47 chars</td><td>No padding; URL-safe; Bitcoin/Cosmos native</td><td>Acceptable if preferred</td></tr>
+</table>
+
+<div class="callout info">
+  <div class="callout-title">ℹ️ Hex chosen for ThreatAttest</div>
+  Since <code>attester_sig</code> is already 128-char hex in the existing codebase, and
+  <code>artifact_sha256</code> is hex, we use hex throughout for consistency. The <code>p=</code>
+  field is 66 hex characters (33 bytes compressed key).
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="identity-binding"></span>
+<h2>7. Identity Binding Model</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>7.1 The Three-Anchor Model</h3>
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────┐
+│                    ATTESTER IDENTITY                            │
+│                                                                 │
+│  ANCHOR 1: On-Chain Address                                     │
+│  ┌──────────────────────────────┐                               │
+│  │ cosmos1abc...xyz             │ ← Cosmos SDK tx signature     │
+│  │ (bech32 address)             │   proves key control          │
+│  └──────────────────────────────┘                               │
+│              │ derived from                                     │
+│              ▼                                                  │
+│  ANCHOR 2: secp256k1 Public Key                                 │
+│  ┌──────────────────────────────┐                               │
+│  │ 02a4b5c6...01 (33 bytes)     │ ← attester_sig proves         │
+│  │ (compressed, hex)            │   message-level key control   │
+│  └──────────────────────────────┘                               │
+│              │ published in                                     │
+│              ▼                                                  │
+│  ANCHOR 3: DNS-Pinned Identity (NEW)                            │
+│  ┌──────────────────────────────┐                               │
+│  │ v1._tatkey.example.com TXT   │ ← DNSSEC proves DNS zone      │
+│  │ p=02a4b5c6...01              │   control (domain ownership)  │
+│  │ a=cosmos1abc...xyz           │                               │
+│  │ + _tatproof sig              │ ← secp256k1 proof proves      │
+│  └──────────────────────────────┘   private key control         │
+│                                                                 │
+│  Verifier checks: anchor1 == derive(anchor2) == DNS(anchor3)    │
+└─────────────────────────────────────────────────────────────────┘</div>
+
+<h3>7.2 What Each Anchor Proves</h3>
+<table>
+  <tr><th>Anchor</th><th>What it proves</th><th>What it doesn't prove</th></tr>
+  <tr>
+    <td><strong>1. On-chain address</strong></td>
+    <td>Control of the secp256k1 private key (via standard Cosmos tx signature)</td>
+    <td>Real-world identity; domain ownership</td>
+  </tr>
+  <tr>
+    <td><strong>2. attester_sig</strong></td>
+    <td>The attester signed the specific attestation payload — preventing replay and message-level forgery</td>
+    <td>Domain ownership; organisational identity</td>
+  </tr>
+  <tr>
+    <td><strong>3. DNS TXT + DNSSEC + proof sig</strong></td>
+    <td>The holder of that key also controls the DNS zone for <code>example.com</code> — a real-world identity anchor; key has not been replaced/revoked at publication time</td>
+    <td>Legal identity (but domain WHOIS + CT logs provide a paper trail)</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="registration"></span>
+<h2>8. Registration Flow</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-ops">Operations</span>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Generate or derive the secp256k1 keypair</div>
+      <p>The attester uses their existing Cosmos key. If registering a dedicated attestation key (recommended for organisations), generate a fresh keypair with a hardware wallet or HSM.</p>
+      <pre><code><span class="comment"># Export compressed pubkey from Cosmos keyring</span>
+threatattestd keys show mykey --bech acc --pubkey
+<span class="comment"># Output: {"@type":"/cosmos.crypto.secp256k1.PubKey","key":"Aq..."} (base64)</span>
+<span class="comment"># Convert to hex for DNS TXT field:</span>
+python3 -c "import base64,binascii; print(binascii.hexlify(base64.b64decode('Aq...')).decode())"</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Choose a selector</div>
+      <p>Pick a selector string (e.g. <code>v1</code>, <code>2025a</code>, <code>yubikey1</code>). The selector is part of the DNS record name and allows key rotation without disrupting existing attestations. Convention: use a date (<code>20251001</code>) or incrementing version.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Sign the domain proof</div>
+      <p>Compute and sign the domain proof payload with the secp256k1 private key:</p>
+      <pre><code><span class="comment"># Payload to sign (UTF-8 encoded, SHA-256 hashed before signing)</span>
+payload = <span class="str">"tatkey-domain-proof|threatintel.example.com|v1|cosmos1abc...xyz"</span>
+<span class="comment"># Sign with secp256k1 private key (same as attester_sig signing)</span>
+proof_sig = secp256k1_sign(SHA256(payload))</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">Publish DNS records</div>
+      <p>Add the following records to the DNS zone (use TTL 300–3600 seconds):</p>
+      <pre><code><span class="comment">; Key pin record</span>
+<span class="str">v1._tatkey.threatintel.example.com.  300 IN TXT (
+  "v=TAT1; k=secp256k1; "
+  "p=02a4b5...01; "
+  "a=cosmos1abc...xyz; "
+  "n=ThreatIntel Example Corp; "
+  "t=1710000000; exp=1741536000"
+)
+
+; Domain proof record</span>
+<span class="str">_tatproof.threatintel.example.com.  300 IN TXT (
+  "v=TAT1; proof=aabb...ff; sel=v1"
+)
+
+; Active selector pointer</span>
+<span class="str">active._tatkey.threatintel.example.com.  300 IN CNAME
+  v1._tatkey.threatintel.example.com.</span></code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <div class="step-title">Enable and verify DNSSEC signing</div>
+      <p>Ensure the zone is signed with DNSSEC (ECDSAP256SHA256 recommended). Verify using:</p>
+      <pre><code><span class="comment"># Verify DNSSEC chain for the TXT record</span>
+dig +dnssec +multi v1._tatkey.threatintel.example.com. TXT
+<span class="comment"># Must show: RRSIG, flags: qr rd ra ad (ad = Authenticated Data)
+
+# Check DS record is published at parent zone</span>
+dig +dnssec DS threatintel.example.com. @a.gtld-servers.net.
+
+<span class="comment"># End-to-end DNSSEC validation (using drill)</span>
+drill -TD v1._tatkey.threatintel.example.com. TXT</code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <div class="step-title">Register attester_domain on-chain</div>
+      <p>Submit a <code>MsgRegisterAttesterDomain</code> transaction (new message — see §10) specifying the domain and selector. The keeper verifies the DNS record at submission time and stores the domain binding on-chain.</p>
+      <pre><code>threatattestd tx attestation register-domain   --domain "threatintel.example.com"   --selector "v1"   --from mykey   --chain-id threatattest-1</code></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="verification"></span>
+<h2>9. Verification Flow</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>9.1 On-Chain Verification (Keeper)</h3>
+<p>
+  When <code>MsgPublishAttestation</code> is received and the attester has a registered domain,
+  the keeper performs DNS verification as part of message processing:
+</p>
+<div class="diagram">
+MsgPublishAttestation received
+          │
+          ▼
+1. Standard checks (reputation gate, sig verify, etc.)
+          │
+          ▼
+2. Has attester registered a domain? (keeper.GetAttesterDomain(ctx, attester))
+          ├── No → proceed without DNS bonus (trust score unaffected)
+          └── Yes ──────────────────────────────────────────────────┐
+                                                                    │
+          3. Is DNS check cache fresh? (< 1 epoch = 30 min)        │
+          ├── Yes (cached VALID) → apply DNS bonus, continue       │
+          └── No → perform live DNS lookup                          │
+                        │                                           │
+          4. Resolve {selector}._tatkey.{domain} TXT               │
+          │  with DNSSEC validation (DO=1)                          │
+          ├── DNSSEC validation FAILED → no DNS bonus              │
+          └── DNSSEC SECURE                                         │
+                        │                                           │
+          5. Parse TXT fields:                                      │
+          │  - v=TAT1 ✓                                             │
+          │  - p= matches attester pubkey ✓                         │
+          │  - a= matches attester address ✓                        │
+          │  - exp= not in past ✓                                   │
+          │  - p= not empty (not revoked) ✓                         │
+          ├── Any check FAILS → no DNS bonus                        │
+          └── All checks PASS                                        │
+                        │                                           │
+          6. Verify _tatproof signature                             │
+          ├── Signature INVALID → no DNS bonus                      │
+          └── Signature VALID                                        │
+                        │                                           │
+          7. Apply DNS-pinned trust bonus:                          │
+          │  trust_score += DNS_BONUS (configurable, default +200)  │
+          │  flag attestation as dns_verified = true                │
+          └── Cache result for 1 epoch ←─────────────────────────── ┘</div>
+
+<h3>9.2 Off-Chain Verification (Browser Extension / API Client)</h3>
+<p>
+  The ThreatAttest browser extension and any API client can independently verify DNS pinning
+  without trusting the node:
+</p>
+<pre><code><span class="comment">// In the browser extension (src/api.js)</span>
+<span class="kw">async function</span> <span class="label">verifyDNSPin</span>(attester, domain, selector, pubkeyHex) {
+  <span class="comment">// Use DoH (DNS over HTTPS) for browser context</span>
+  <span class="kw">const</span> dohURL = <span class="str">`https://cloudflare-dns.com/dns-query?name=${selector}._tatkey.${domain}&type=TXT`</span>;
+  <span class="kw">const</span> res = <span class="kw">await</span> fetch(dohURL, { headers: { Accept: <span class="str">'application/dns-json'</span> } });
+  <span class="kw">const</span> data = <span class="kw">await</span> res.json();
+
+  <span class="comment">// Check DNSSEC validated (AD flag in DoH response)</span>
+  <span class="kw">if</span> (!data.AD) <span class="kw">return</span> { valid: <span class="val">false</span>, reason: <span class="str">'DNSSEC not validated'</span> };
+
+  <span class="comment">// Parse TXT fields</span>
+  <span class="kw">const</span> txt = data.Answer?.find(r => r.type === <span class="val">16</span>)?.data || <span class="str">''</span>;
+  <span class="kw">const</span> fields = parseTATKeyRecord(txt);
+
+  <span class="comment">// Verify pubkey matches</span>
+  <span class="kw">if</span> (fields.p !== pubkeyHex) <span class="kw">return</span> { valid: <span class="val">false</span>, reason: <span class="str">'pubkey mismatch'</span> };
+
+  <span class="comment">// Verify cosmos address derivation</span>
+  <span class="kw">if</span> (deriveCosmosAddr(fields.p) !== attester) <span class="kw">return</span> { valid: <span class="val">false</span>, reason: <span class="str">'address mismatch'</span> };
+
+  <span class="comment">// Check expiry</span>
+  <span class="kw">if</span> (fields.exp && parseInt(fields.exp) < Date.now() / <span class="val">1000</span>)
+    <span class="kw">return</span> { valid: <span class="val">false</span>, reason: <span class="str">'key expired'</span> };
+
+  <span class="kw">return</span> { valid: <span class="val">true</span>, name: fields.n || domain };
+}</code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="rotation"></span>
+<h2>10. Key Rotation</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-ops">Operations</span>
+<p>
+  Key rotation is the most operationally sensitive part of any pinning scheme. We adopt
+  DKIM's selector-based rotation model, which allows old and new keys to coexist during
+  a transition window.
+</p>
+
+<h3>10.1 Rotation Procedure</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">Publish new key under a new selector (pre-publish phase)</div>
+      <p>Add the new key TXT record at least 2× DNS TTL before switching (minimum 10 minutes). This ensures resolvers worldwide have cached the new key before it becomes active.</p>
+      <pre><code><span class="comment"># New key published BEFORE switching</span>
+<span class="str">v2._tatkey.example.com.  300 IN TXT "v=TAT1; k=secp256k1; p=03new...; a=cosmos1new...; t=...; flags=r"</span>
+<span class="str">_tatproof.example.com.   300 IN TXT "v=TAT1; proof=new_proof_sig; sel=v2"</span></code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Submit MsgRotateAttesterKey on-chain</div>
+      <p>Broadcast the rotation transaction, which is signed by BOTH old and new keys (dual-sig rotation, prevents hijacking). The keeper updates the on-chain domain record and sets a rotation window of 72 hours during which both keys are valid.</p>
+      <pre><code>threatattestd tx attestation rotate-key   --domain "example.com"   --new-selector "v2"   --old-selector "v1"   --from mykey-v1 \         <span class="comment"># old key signs</span>
+  --new-pubkey 03new...     <span class="comment"># new pubkey for verification</span></code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Switch active pointer</div>
+      <p>Update the active CNAME to point to the new selector. Old attestations signed with the old key remain valid (they carry the selector in <code>attester_domain_selector</code>) and can still be verified using the old key record.</p>
+      <pre><code><span class="str">active._tatkey.example.com.  300 IN CNAME  v2._tatkey.example.com.</span>
+<span class="comment"># Old record remains for 72h rotation window, then can be removed</span></code></pre>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">Retire old key after rotation window</div>
+      <p>After 72 hours (or the configured rotation window), remove the old TXT record or replace it with an empty <code>p=</code> to signal revocation. Update <code>prev=v1</code> in the new record so verifiers know to look for the old key when verifying pre-rotation attestations.</p>
+    </div>
+  </div>
+</div>
+
+<h3>10.2 Key Rotation TTL Timing</h3>
+<div class="diagram">
+Time ──────────────────────────────────────────────────────────────▶
+
+  T=0          T+5min       T+15min       T+87min       T+159min
+   │            │            │             │             │
+   │ Publish v2 │            │ Switch CNAME│ Remove v1   │
+   │ (pre-pub)  │            │ to v2       │ (TTL expired)│
+   │            │            │             │             │
+  ─┼────────────┼────────────┼─────────────┼─────────────┼──────
+   │  v1 active │  v1+v2     │ v2 active   │ v2 only     │
+   │            │  (both     │ v1 still    │             │
+   │            │   valid)   │ valid for   │             │
+   │            │            │ 72h window  │             │
+   │            │            │             │             │
+   └────────────┴────────────┴─────────────┴─────────────┘
+   DNS TTL = 300s (5min)
+   Pre-publish wait = 2× TTL = 10min
+   Full rotation safe after = TTL expiry across all resolvers</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="revocation"></span>
+<h2>11. Key Revocation</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-sec">Security</span>
+<p>
+  Revocation is critical when a private key is compromised. Unlike rotation (orderly planned
+  change), revocation must be instant and fail-closed.
+</p>
+
+<h3>11.1 DNS-Level Revocation</h3>
+<p>
+  Set <code>p=</code> (empty) in the TXT record. Verifiers MUST treat an empty <code>p=</code>
+  field as explicit revocation, immediately stop accepting attestations from this key, and
+  flag all existing ACTIVE attestations signed by this key as <strong>DISPUTED</strong>.
+</p>
+<pre><code><span class="comment">; Emergency revocation — empty p= field signals key compromise</span>
+<span class="str">v1._tatkey.example.com.  60 IN TXT "v=TAT1; k=secp256k1; p=; a=cosmos1abc...xyz"</span>
+<span class="comment">; TTL set to 60s for rapid propagation</span></code></pre>
+
+<h3>11.2 On-Chain Revocation</h3>
+<p>
+  Submit <code>MsgRevokeAttesterDomain</code> on-chain (new message). The keeper immediately:
+</p>
+<ol style="margin: 0 0 16px 24px; line-height: 2.2;">
+  <li>Marks all ACTIVE attestations from this attester as <code>DISPUTED</code></li>
+  <li>Removes the DNS domain binding from the attester record</li>
+  <li>Reduces reputation score by a configurable penalty (default: −50 RS)</li>
+  <li>Emits an <code>EventAttesterKeyRevoked</code> event for indexers</li>
+</ol>
+
+<h3>11.3 Emergency Revocation Without Private Key</h3>
+<p>
+  If the private key is lost/stolen and the attester cannot sign a revocation tx:
+</p>
+<div class="callout warn">
+  <div class="callout-title">⚠️ Social Recovery Path</div>
+  The attester updates the DNS zone (using DNS zone credentials, separate from the signing key)
+  to set <code>p=</code> (empty). The on-chain keeper, during its next DNS health-check (every
+  epoch = ~30 min), detects the revocation and auto-applies it. This provides a ~30 minute
+  worst-case revocation window using only DNS credentials.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="cross-pin"></span>
+<h2>12. Cross-Chain & Multi-Domain Pinning</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>12.1 Multi-Domain Attesters</h3>
+<p>
+  Large organisations may have multiple domains. Each domain may pin the same key (using identical
+  <code>p=</code> fields) or different keys. The on-chain attester record supports a list of
+  verified domains:
+</p>
+<pre><code><span class="comment">// AttesterDomainRecord — stored on-chain per attester</span>
+<span class="kw">type</span> AttesterDomainRecord <span class="kw">struct</span> {
+    Attester    string          <span class="comment">// cosmos1… address</span>
+    Domains     []DomainPin     <span class="comment">// all verified domain pins</span>
+    PrimaryDomain string        <span class="comment">// canonical identity domain</span>
+    VerifiedAt  int64           <span class="comment">// last DNS verification block height</span>
+}
+
+<span class="kw">type</span> DomainPin <span class="kw">struct</span> {
+    Domain     string   <span class="comment">// e.g. "threatintel.example.com"</span>
+    Selector   string   <span class="comment">// e.g. "v1"</span>
+    PubKeyHex  string   <span class="comment">// cached compressed pubkey from DNS</span>
+    VerifiedAt int64
+    ExpiresAt  int64
+}</code></pre>
+
+<h3>12.2 Cross-Chain Attestation References</h3>
+<p>
+  A ThreatAttest attester may also want to reference their identity on other blockchains.
+  The <code>_tatkey</code> TXT record supports an optional <code>chains=</code> field:
+</p>
+<pre><code><span class="str">v1._tatkey.example.com. 300 IN TXT (
+  "v=TAT1; k=secp256k1; p=02...; a=cosmos1...; "
+  "chains=ethereum:0xABCD...;bitcoin:bc1q...;solana:ABC..."
+)</span>
+<span class="comment">; Format: "chains={chain}:{address};{chain}:{address};..."
+; Each chain address independently verifiable via its own key derivation</span></code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="chain-integration"></span>
+<h2>13. On-Chain Integration</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-chain">Cosmos SDK</span>
+<h3>13.1 New Module: x/dnsidentity (or extension to x/attestation)</h3>
+<p>
+  DNS identity management can live as a sub-module of <code>x/attestation</code> or as a
+  standalone <code>x/dnsidentity</code> module. We recommend extending <code>x/attestation</code>
+  to avoid cross-module keeper dependencies.
+</p>
+
+<h3>13.2 New Types</h3>
+<pre><code><span class="comment">// New proto types to add to types.proto</span>
+
+<span class="kw">type</span> DNSIdentityRecord <span class="kw">struct</span> {
+    Attester        string   <span class="val">`json:"attester"`</span>
+    Domain          string   <span class="val">`json:"domain"`</span>            <span class="comment">// e.g. "threatintel.example.com"</span>
+    Selector        string   <span class="val">`json:"selector"`</span>          <span class="comment">// e.g. "v1"</span>
+    PubKeyHex       string   <span class="val">`json:"pubkey_hex"`</span>        <span class="comment">// cached from DNS</span>
+    DisplayName     string   <span class="val">`json:"display_name"`</span>      <span class="comment">// from n= field</span>
+    VerifiedAt      int64    <span class="val">`json:"verified_at"`</span>       <span class="comment">// block height of last DNS check</span>
+    ExpiresAt       int64    <span class="val">`json:"expires_at"`</span>        <span class="comment">// from exp= field</span>
+    RotationHistory []string <span class="val">`json:"rotation_history"`</span>  <span class="comment">// past selectors</span>
+    Status          DNSIDStatus <span class="val">`json:"status"`</span>
+}
+
+<span class="kw">type</span> DNSIDStatus <span class="kw">int32</span>
+<span class="kw">const</span> (
+    DNSIDStatus_UNVERIFIED DNSIDStatus = 0
+    DNSIDStatus_ACTIVE     DNSIDStatus = 1  <span class="comment">// DNS check passed</span>
+    DNSIDStatus_EXPIRED    DNSIDStatus = 2  <span class="comment">// exp= in past</span>
+    DNSIDStatus_REVOKED    DNSIDStatus = 3  <span class="comment">// p= empty detected</span>
+    DNSIDStatus_UNREACHABLE DNSIDStatus = 4 <span class="comment">// DNS query failed</span>
+)</code></pre>
+
+<span class="page-anchor" id="msg-changes"></span>
+<h3>13.3 New Messages</h3>
+<pre><code><span class="comment">// MsgRegisterAttesterDomain — links a domain to an attester</span>
+<span class="kw">type</span> MsgRegisterAttesterDomain <span class="kw">struct</span> {
+    Attester  string <span class="val">`json:"attester"`</span>   <span class="comment">// cosmos1… address (tx signer)</span>
+    Domain    string <span class="val">`json:"domain"`</span>     <span class="comment">// max 253 chars, must be valid FQDN</span>
+    Selector  string <span class="val">`json:"selector"`</span>   <span class="comment">// max 63 chars, alphanumeric + hyphen</span>
+}
+
+<span class="comment">// MsgRotateAttesterKey — rotates to a new selector</span>
+<span class="kw">type</span> MsgRotateAttesterKey <span class="kw">struct</span> {
+    Attester     string <span class="val">`json:"attester"`</span>
+    Domain       string <span class="val">`json:"domain"`</span>
+    OldSelector  string <span class="val">`json:"old_selector"`</span>
+    NewSelector  string <span class="val">`json:"new_selector"`</span>
+    NewPubKeyHex string <span class="val">`json:"new_pubkey_hex"`</span>  <span class="comment">// must match DNS before tx accepted</span>
+}
+
+<span class="comment">// MsgRevokeAttesterDomain — emergency revocation</span>
+<span class="kw">type</span> MsgRevokeAttesterDomain <span class="kw">struct</span> {
+    Attester string <span class="val">`json:"attester"`</span>
+    Domain   string <span class="val">`json:"domain"`</span>
+    Reason   string <span class="val">`json:"reason"`</span>  <span class="comment">// e.g. "key_compromise", "domain_transfer"</span>
+}</code></pre>
+
+<h3>13.4 MsgPublishAttestation Extension</h3>
+<pre><code><span class="comment">// Add optional field to MsgPublishAttestation</span>
+<span class="kw">type</span> MsgPublishAttestation <span class="kw">struct</span> {
+    <span class="comment">// … existing fields …</span>
+
+    <span class="comment">// NEW: Optional DNS identity pin reference</span>
+    AttesterDomain   string <span class="val">`json:"attester_domain,omitempty"`</span>    <span class="comment">// e.g. "threatintel.example.com"</span>
+    AttesterSelector string <span class="val">`json:"attester_selector,omitempty"`</span>  <span class="comment">// e.g. "v1" — which key was used</span>
+}</code></pre>
+
+<span class="page-anchor" id="keeper-changes"></span>
+<h3>13.5 Keeper Changes</h3>
+<pre><code><span class="comment">// In keeper/msg_server.go — PublishAttestation handler</span>
+<span class="kw">func</span> (k Keeper) PublishAttestation(ctx Context, msg *MsgPublishAttestation) (*MsgPublishAttestationResponse, error) {
+    <span class="comment">// … existing validation …</span>
+
+    <span class="comment">// NEW: DNS identity verification</span>
+    <span class="kw">if</span> msg.AttesterDomain != <span class="str">""</span> {
+        dnsRecord, err := k.GetDNSIdentityRecord(ctx, msg.Attester)
+        <span class="kw">if</span> err == nil && dnsRecord.Status == DNSIDStatus_ACTIVE {
+            <span class="comment">// Cached verification still fresh (within 1 epoch)</span>
+            <span class="kw">if</span> ctx.BlockHeight()-dnsRecord.VerifiedAt < BlocksPerEpoch {
+                rec.DNSVerified = true
+                rec.DNSIdentityDomain = msg.AttesterDomain
+            } <span class="kw">else</span> {
+                <span class="comment">// Cache stale — trigger async re-verification via ABCI</span>
+                k.EnqueueDNSVerification(ctx, msg.Attester, msg.AttesterDomain, msg.AttesterSelector)
+            }
+        }
+    }
+
+    <span class="comment">// … store record …</span>
+}
+
+<span class="comment">// In abci/abci.go — EndBlock hook for DNS re-verification</span>
+<span class="kw">func</span> EndBlock(ctx Context, k Keeper) {
+    queue := k.GetDNSVerificationQueue(ctx)
+    <span class="kw">for</span> _, job := <span class="kw">range</span> queue {
+        result := k.PerformDNSVerification(ctx, job)  <span class="comment">// live DNS query</span>
+        k.UpdateDNSIdentityRecord(ctx, result)
+        k.EmitDNSVerificationEvent(ctx, result)
+    }
+}</code></pre>
+
+<span class="page-anchor" id="trust-delta"></span>
+<h3>13.6 Trust Score Delta</h3>
+<p>
+  DNS verification adds a bonus to the computed trust score. The formula extension:
+</p>
+<pre><code><span class="comment">// Existing formula:
+// TrustScore = (SeverityWeight × ConfidenceFraction × EndorseFactor × TierWeight) × 1000
+
+// NEW: DNS pinning multiplier
+func TrustScore(severity, confidence, endorsements, attesterRS uint32, dnsVerified bool) uint32 {
+    base := existingTrustScore(severity, confidence, endorsements, attesterRS)
+
+    if dnsVerified {
+        // Apply DNS bonus: flat +200 points, capped at 1000
+        bonus := uint32(200)
+        if base + bonus > 1000 {
+            return 1000
+        }
+        return base + bonus
+    }
+    return base
+}</span>
+
+<span class="comment">// DNS verification status also gates reputation tier upgrades:
+// Tier 3 (Expert) requires dns_verified = true for the past 30 days</span></code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="threat-model"></span>
+<h2>14. Threat Model</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-sec">Security</span>
+<table>
+  <tr><th>Threat</th><th>Attacker Capability</th><th>Impact</th><th>Mitigation</th></tr>
+  <tr>
+    <td><strong>DNS Cache Poisoning</strong></td>
+    <td>Inject false TXT record into resolver cache (Kaminsky-style)</td>
+    <td>Attacker substitutes their pubkey → falsely appears DNS-verified</td>
+    <td><strong>DNSSEC</strong> — forged records cannot produce valid RRSIG. Verifier MUST require AD flag.</td>
+  </tr>
+  <tr>
+    <td><strong>DNS Zone Compromise</strong></td>
+    <td>Gain write access to DNS zone (registrar account takeover, BGP hijack of authoritative NS)</td>
+    <td>Can replace TXT record with attacker's key</td>
+    <td>Domain proof signature: attacker must also have the private key. DNSSEC doesn't help here — defence is registrar 2FA, DNSSEC key custody separation.</td>
+  </tr>
+  <tr>
+    <td><strong>Domain Transfer Attack</strong></td>
+    <td>Acquire expired/transferred domain that had a _tatkey record</td>
+    <td>New owner inherits on-chain DNS-verified status</td>
+    <td>On-chain expiry window: DNS pins expire after <code>exp=</code> timestamp. Keeper re-verifies every epoch. <code>MsgRevokeAttesterDomain</code> on domain transfer.</td>
+  </tr>
+  <tr>
+    <td><strong>Replay of Old DNS Record</strong></td>
+    <td>Present a previously valid (now rotated) DNS record</td>
+    <td>Pass verification using stale cached pubkey</td>
+    <td>Selector pinned in attestation message + <code>t=</code> / <code>exp=</code> fields + keeper epoch re-check.</td>
+  </tr>
+  <tr>
+    <td><strong>Key Exfiltration</strong></td>
+    <td>Steal private key from attester's system</td>
+    <td>Adversary can publish attestations as if DNS-verified</td>
+    <td>Rapid revocation (DNS <code>p=</code> empty → ~30 min auto-revocation via keeper epoch). HSM/hardware wallet for key storage.</td>
+  </tr>
+  <tr>
+    <td><strong>DNSSEC Key Compromise</strong></td>
+    <td>Steal DNSSEC ZSK to forge signed records</td>
+    <td>Can forge any DNS record including _tatkey</td>
+    <td>ZSK rotation every 90 days; KSK in offline HSM; automated DNSSEC key management (RFC 8901, RFC SAC126). Multi-validator consensus on DNS results.</td>
+  </tr>
+  <tr>
+    <td><strong>Sybil Domain Attack</strong></td>
+    <td>Register many cheap domains, each with a distinct key</td>
+    <td>Inflate apparent diversity of attester pool</td>
+    <td>Reputation score is per-address not per-domain. DNS pinning is a bonus, not a multiplier. TATST stake requirement still applies.</td>
+  </tr>
+  <tr>
+    <td><strong>DNS Resolver MITM</strong></td>
+    <td>Intercept attester-to-resolver traffic</td>
+    <td>Return forged NXDOMAIN or corrupt response</td>
+    <td>DNS over TLS/HTTPS for resolver transport. DNSSEC validation is local where possible.</td>
+  </tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="attack-vectors"></span>
+<h2>15. Attack Vectors & Response Procedures</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>15.1 Zone Compromise Response</h3>
+<div class="callout danger">
+  <div class="callout-title">🚨 Incident Response: DNS Zone Compromise</div>
+  <ol style="margin: 8px 0 0 20px; line-height: 2.2;">
+    <li><strong>Immediately</strong> set <code>p=</code> (empty) in all <code>_tatkey</code> TXT records</li>
+    <li>Within 30 minutes, the keeper's epoch DNS health-check detects the revocation</li>
+    <li>Separately, submit <code>MsgRevokeAttesterDomain</code> if private key access is available</li>
+    <li>Regain zone control, generate a new keypair, publish under a new selector</li>
+    <li>Submit <code>MsgRegisterAttesterDomain</code> with the new key</li>
+    <li>Review all attestations published during the compromise window via governance dispute</li>
+  </ol>
+</div>
+
+<h3>15.2 Key Compromise Response</h3>
+<div class="callout danger">
+  <div class="callout-title">🚨 Incident Response: Signing Key Compromise</div>
+  <ol style="margin: 8px 0 0 20px; line-height: 2.2;">
+    <li>Update DNS to set <code>p=</code> (empty) using DNS zone credentials — stops DNS bonus and triggers keeper auto-revocation within one epoch</li>
+    <li>If tx-signing key still available: submit <code>MsgRevokeAttesterDomain</code> immediately</li>
+    <li>Rotate to a new keypair (new Cosmos address). The old address's reputation is penalised and domain unlinked</li>
+    <li>Publish new key under a new selector; submit <code>MsgRegisterAttesterDomain</code></li>
+  </ol>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="mitigations"></span>
+<h2>16. Additional Mitigations</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>16.1 Multi-Validator DNS Consensus</h3>
+<p>
+  Rather than a single node making the DNS resolution decision (single point of failure /
+  manipulation), validators submit DNS verification results as a commit-reveal scheme:
+</p>
+<pre><code><span class="comment">// Each validator independently resolves DNS and submits a hash of the result</span>
+<span class="comment">// in their ABCI vote extension (Cosmos SDK v0.50 vote extensions)</span>
+<span class="kw">type</span> ValidatorDNSVote <span class="kw">struct</span> {
+    Attester    string
+    Domain      string
+    Selector    string
+    PubKeyHex   string  <span class="comment">// what they resolved</span>
+    Valid        bool
+    BlockHeight int64
+}
+
+<span class="comment">// Consensus: ≥ 2/3 of validators must agree on the resolved pubkey
+// Prevents a single malicious validator from manipulating DNS results</span></code></pre>
+
+<h3>16.2 Transparency Log Integration</h3>
+<p>
+  All DNS identity registration, rotation, and revocation events are emitted as on-chain events
+  and can be consumed by off-chain transparency log services (analogous to Certificate
+  Transparency for TLS certificates):
+</p>
+<pre><code>EventType: "attester_dns_registered"
+  attester: cosmos1abc...
+  domain:   threatintel.example.com
+  selector: v1
+  pubkey:   02a4b5...
+  block:    12345
+
+EventType: "attester_key_rotated"
+  attester: cosmos1abc...
+  old_sel:  v1
+  new_sel:  v2
+  block:    23456
+
+EventType: "attester_key_revoked"
+  attester: cosmos1abc...
+  domain:   threatintel.example.com
+  reason:   key_compromise
+  block:    34567</code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="dns-setup"></span>
+<h2>17. DNS Setup Guide</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-ops">Operations</span>
+<h3>17.1 BIND 9 Zone File Example</h3>
+<pre><code>$ORIGIN threatintel.example.com.
+$TTL 300
+
+<span class="comment">; ── ThreatAttest Key Pin ──────────────────────────────────────</span>
+v1._tatkey  300 IN TXT ( "v=TAT1; "
+                          "k=secp256k1; "
+                          "p=02a4b5c6d7e8f90011223344556677889900aabbccddeeff0102030405060708; "
+                          "a=cosmos1qyqa2zn5c925q7w0e7a9nzgjqpxnqq48k6ycl9; "
+                          "n=ThreatIntel Example Corp; "
+                          "t=1710000000; "
+                          "exp=1741536000" )
+
+<span class="comment">; ── Domain Proof ─────────────────────────────────────────────</span>
+_tatproof   300 IN TXT ( "v=TAT1; "
+                          "proof=aabbccddeeff...128hexchars...; "
+                          "sel=v1" )
+
+<span class="comment">; ── Active Pointer ───────────────────────────────────────────</span>
+active._tatkey  300 IN CNAME v1._tatkey
+
+<span class="comment">; ── Optional: did:dns Compatible URI Record ──────────────────</span>
+_key1._did  300 IN URI 100 10 "did:key:zQ3shPyZJMoHMFWTb1xZCGNdBNpBGBq3ZKtP1bCvyBpBbdnt"
+
+<span class="comment">; ── DNSSEC (auto-generated by signing tool — example only) ───</span>
+v1._tatkey  300 IN RRSIG TXT 13 4 300 (
+                          20260101000000 20251001000000
+                          1234 threatintel.example.com.
+                          BASE64RRSIGDATA... )</code></pre>
+
+<h3>17.2 Cloudflare DNS Setup (UI / API)</h3>
+<pre><code><span class="comment"># Using Cloudflare API to add TXT record</span>
+curl -X POST "https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records"   -H "Authorization: Bearer {API_TOKEN}"   -H "Content-Type: application/json"   --data '{
+    "type": "TXT",
+    "name": "v1._tatkey.threatintel.example.com",
+    "content": "v=TAT1; k=secp256k1; p=02...; a=cosmos1...; n=Example; t=1710000000; exp=1741536000",
+    "ttl": 300
+  }'
+
+<span class="comment"># Enable DNSSEC on Cloudflare zone (generates DS record to add to registrar)</span>
+curl -X POST "https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dnssec"   -H "Authorization: Bearer {API_TOKEN}"</code></pre>
+
+<h3>17.3 Verification Commands</h3>
+<pre><code><span class="comment"># 1. Verify TXT record is present</span>
+dig TXT v1._tatkey.threatintel.example.com.
+
+<span class="comment"># 2. Verify DNSSEC chain (AD flag in flags field = authenticated)</span>
+dig +dnssec TXT v1._tatkey.threatintel.example.com.
+<span class="comment">#  Expected: flags: qr rd ra ad;  (ad = Authenticated Data)</span>
+
+<span class="comment"># 3. Full DNSSEC trace</span>
+drill -TD v1._tatkey.threatintel.example.com. TXT
+
+<span class="comment"># 4. Verify using delv (BIND validation tool)</span>
+delv @8.8.8.8 TXT v1._tatkey.threatintel.example.com. +rtrace
+
+<span class="comment"># 5. Check via DoH (what the browser extension uses)</span>
+curl "https://cloudflare-dns.com/dns-query?name=v1._tatkey.threatintel.example.com&type=TXT"   -H "Accept: application/dns-json" | jq '.AD, .Answer[].data'
+<span class="comment"># AD: true = DNSSEC validated</span>
+
+<span class="comment"># 6. Verify using the threatattestd CLI (new command)</span>
+threatattestd query attestation verify-dns-identity   --attester cosmos1abc...xyz   --domain threatintel.example.com   --selector v1</code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="tooling"></span>
+<h2>18. Tooling</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<h3>18.1 tatkey CLI Tool (proposed)</h3>
+<pre><code><span class="comment"># Generate and publish _tatkey TXT record from a Cosmos key</span>
+tatkey generate   --key-name mykey   --keyring-backend file   --domain threatintel.example.com   --selector v1   --expire-days 365   --name "ThreatIntel Example Corp"
+<span class="comment"># Outputs: DNS TXT record + proof record ready to copy-paste</span>
+
+<span class="comment"># Verify a domain's DNS pin against an on-chain attester</span>
+tatkey verify   --attester cosmos1abc...xyz   --domain threatintel.example.com
+
+<span class="comment"># Rotate to a new key</span>
+tatkey rotate   --old-key mykey-v1   --new-key mykey-v2   --domain threatintel.example.com   --old-selector v1   --new-selector v2
+
+<span class="comment"># Revoke (emergency)</span>
+tatkey revoke   --domain threatintel.example.com   --selector v1</code></pre>
+
+<h3>18.2 Browser Extension Integration</h3>
+<p>
+  The ThreatAttest Shield browser extension can display DNS identity information alongside
+  threat details. When viewing a threat attestation, the extension shows:
+</p>
+<pre><code><span class="comment">// In threat overlay (showThreatOverlayInPage)</span>
+<span class="kw">if</span> (attest.dns_verified && attest.dns_identity_domain) {
+    dnsRow.innerHTML = `
+        🔏 <strong>DNS-Verified Identity</strong>:
+        <a href="https://${attest.dns_identity_domain}">${attest.dns_identity_domain}</a>
+        <span style="color:#22c55e;">✓ DNSSEC</span>
+        ${attest.display_name ? `— <em>${attest.display_name}</em>` : ""}
+    `;
+}</code></pre>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<span class="page-anchor" id="compliance"></span>
+<h2>19. Compliance Tiers</h2>
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<span class="section-tag tag-ops">Governance</span>
+<table>
+  <tr>
+    <th>Tier</th>
+    <th>Requirements</th>
+    <th>On-chain benefits</th>
+    <th>Enforcement</th>
+  </tr>
+  <tr>
+    <td><strong>Tier 0 — Anonymous</strong></td>
+    <td>Standard Cosmos address, min TATST stake, reputation ≥ 10</td>
+    <td>Base trust score; max RS = 49</td>
+    <td>Current mechanism</td>
+  </tr>
+  <tr>
+    <td><strong>Tier 1 — Domain-Associated</strong></td>
+    <td>DNSSEC-signed TXT record + domain proof</td>
+    <td>+200 trust score bonus; max RS = 149; display name shown</td>
+    <td>Keeper epoch DNS verification</td>
+  </tr>
+  <tr>
+    <td><strong>Tier 2 — Domain-Verified (30d)</strong></td>
+    <td>Tier 1 + ≥30 days continuous valid DNS pin + 0 disputes</td>
+    <td>+250 trust score; max RS = 299; "verified" badge in UI</td>
+    <td>Keeper tracks continuous verification streak</td>
+  </tr>
+  <tr>
+    <td><strong>Tier 3 — Expert (current)</strong></td>
+    <td>Tier 2 + RS ≥ 300 + validator endorsement</td>
+    <td>Full trust score; max RS = unlimited; expert badge; governance voting weight</td>
+    <td>On-chain reputation + DNS verification</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2>20. Summary</h2>
+<p>
+  This proposal defines a complete, standards-grounded method for pinning ThreatAttest attester
+  identity to DNS using DNSSEC. The design draws from the proven DKIM selector model for key
+  publication and rotation, the DANE/OPENPGPKEY framework for DNS-based key discovery, and the
+  W3C did:dns method for forward compatibility with decentralised identity ecosystems.
+</p>
+<p>
+  The key innovations specific to ThreatAttest are the <strong>domain verification proof</strong>
+  (a secp256k1 signature over the domain name that cross-links the DNS zone to the private key),
+  the <strong>on-chain keeper integration</strong> (automatic DNS health-checks every epoch, cache,
+  auto-revocation), and the <strong>trust score bonus</strong> that incentivises voluntary adoption
+  without making DNS pinning a hard gate.
+</p>
+<p>
+  Combined with multi-validator DNS consensus (vote extensions) and a transparency event log,
+  the system provides a robust, auditable identity layer that is resistant to the main attack
+  vectors (cache poisoning is defeated by DNSSEC; zone compromise is mitigated by the proof
+  signature; key compromise is mitigated by rapid epoch-based auto-revocation via DNS update).
+</p>
+
+<div class="callout success">
+  <div class="callout-title">✅ Reference Standards</div>
+  RFC 4033/4034/4035 (DNSSEC) · RFC 6376 (DKIM) · RFC 6698 (DANE/TLSA) · RFC 7929 (OPENPGPKEY/DANE) ·
+  RFC 4255 (SSHFP) · RFC 7858 (DoT) · RFC 8484 (DoH) · W3C DID Core 1.1 · W3C did:dns method ·
+  Cosmos SDK v0.50 Vote Extensions (RFC SAC126 for DNSSEC automation)
+</div>
+
+</main>
+</div>
+
+<script>
+// Scroll-spy for sidebar navigation
+const navLinks = document.querySelectorAll('.nav-link');
+const sections = document.querySelectorAll('.page-anchor');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+      });
+    }
+  });
+}, { rootMargin: '-20% 0px -75% 0px' });
+
+sections.forEach(s => observer.observe(s));
+
+navLinks.forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const id = link.getAttribute('href').slice(1);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+</script>
+</body>
+</html>

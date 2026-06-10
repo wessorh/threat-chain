@@ -1,0 +1,40 @@
+# ThreatAttest Demo - Sample Malicious File
+# This file simulates a threat artifact for demonstration purposes.
+# In a real scenario this would be a malware binary, suspicious script, etc.
+
+EICAR-STANDARD-ANTIVIRUS-TEST-FILE-NOT-A-REAL-VIRUS
+
+[Simulated Payload]
+XOR_KEY=0xDEADBEEF
+C2_SERVER=192.168.1.100:4444
+PERSISTENCE=HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+DROPPER_STAGE2=https://malicious.example.com/payload.bin
+EXFIL_ENDPOINT=https://malicious.example.com/collect?id=VICTIM_ID
+
+[Behavioral Indicators]
+- Disables Windows Defender via registry
+- Installs scheduled task for persistence
+- Enumerates running processes
+- Searches for .docx, .xlsx, .pdf files
+- Encrypts files with AES-256 (ransomware behavior)
+- Sends beacon every 60 seconds to C2
+
+[Hash Chain]
+MD5: not-a-real-hash
+SHA1: not-a-real-hash
+SHA256: (computed by threatattestd attest-file)
+
+[YARA Match]
+rule SuspiciousDropper {
+    meta:
+        description = "Simulated ransomware dropper"
+        author = "ThreatAttest Demo"
+    strings:
+        $c2 = "malicious.example.com"
+        $xor = { DE AD BE EF }
+        $persistence = "CurrentVersion\\Run"
+    condition:
+        all of them
+}
+
+This file is for DEMONSTRATION PURPOSES ONLY.

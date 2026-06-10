@@ -1,0 +1,52 @@
+syntax = "proto3";
+package threatattest.ipfsverify.v1;
+
+option go_package = "github.com/threatattest/chain/x/ipfsverify/types";
+
+// VerificationJobStatus tracks the state of an IPFS verification job.
+enum VerificationJobStatus {
+  JOB_STATUS_UNSPECIFIED = 0;
+  JOB_STATUS_PENDING     = 1;
+  JOB_STATUS_CONFIRMED   = 2;
+  JOB_STATUS_REJECTED    = 3;
+  JOB_STATUS_EXPIRED     = 4;
+}
+
+// VerificationJob represents a pending IPFS content verification task.
+message VerificationJob {
+  string                rule_id          = 1;
+  string                attestation_id   = 2;
+  string                attester         = 3;
+  string                rule_ipfs_cid    = 4;
+  string                rule_sha256      = 5;
+  uint32                rule_type        = 6;
+  string                artifact_sha256  = 7;
+  int64                 deadline_unix    = 8;
+  uint64                deadline_height  = 9;
+  VerificationJobStatus status           = 10;
+  uint32                report_count     = 11;
+  uint32                confirming_count = 12;
+  uint32                rejecting_count  = 13;
+}
+
+// VerificationReport is a single validator's finding for a job.
+message VerificationReport {
+  string rule_id        = 1;
+  string validator      = 2;
+  bool   verified       = 3;
+  string failure_reason = 4;
+  int64  reported_at    = 5;
+}
+
+// Params holds x/ipfsverify module parameters.
+message Params {
+  uint32 min_reports_to_resolve    = 1; // default 3
+  uint32 verification_window_hours = 2; // default 24
+  string reward_per_job            = 3; // utatst per completed job
+}
+
+// GenesisState defines the genesis state for x/ipfsverify.
+message GenesisState {
+  Params                    params  = 1;
+  repeated VerificationJob  jobs    = 2;
+}

@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatAttest — Identity Module Implementation Docs</title>
+<style>
+:root{--bg:#0f172a;--surface:#1e293b;--border:#334155;--text:#f1f5f9;--muted:#94a3b8;--accent:#38bdf8;--green:#22c55e;--yellow:#f59e0b;--orange:#f97316;--red:#ef4444;--code-bg:#0d1b2a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,'Segoe UI',sans-serif;font-size:14px;line-height:1.7;display:flex;min-height:100vh}
+nav{width:260px;min-width:260px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+nav h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);padding:0 18px 8px}
+nav ul{list-style:none}
+nav li a{display:block;padding:5px 18px;color:var(--muted);text-decoration:none;font-size:12px;transition:color .15s,background .15s;border-left:2px solid transparent}
+nav li a:hover{color:var(--text);background:rgba(255,255,255,.04);border-left-color:var(--accent)}
+nav li a.active{color:var(--accent);border-left-color:var(--accent)}
+nav .nav-group{margin-bottom:12px}
+nav .nav-group-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--border);padding:10px 18px 4px}
+main{flex:1;padding:40px 48px;max-width:1000px}
+h1{font-size:28px;font-weight:800;margin-bottom:6px;color:var(--text)}
+h1 span{color:var(--accent)}
+.subtitle{color:var(--muted);margin-bottom:32px;font-size:15px}
+h2{font-size:20px;font-weight:700;margin:40px 0 12px;padding-top:20px;border-top:1px solid var(--border);color:var(--text)}
+h3{font-size:15px;font-weight:700;margin:24px 0 8px;color:var(--accent)}
+h4{font-size:13px;font-weight:600;margin:16px 0 6px;color:var(--yellow)}
+p{margin-bottom:12px;color:var(--text)}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px;overflow-x:auto;font-size:12px;line-height:1.6;margin:12px 0}
+code{font-family:'SF Mono','Fira Code',monospace;font-size:12px}
+p code,li code{background:var(--code-bg);border:1px solid var(--border);padding:1px 5px;border-radius:3px;font-size:11px}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:.5px;margin-right:4px}
+.badge-new{background:#14532d;color:#86efac}
+.badge-changed{background:#78350f;color:#fcd34d}
+.badge-go{background:#0e2a4a;color:#60a5fa}
+.badge-js{background:#2d2006;color:#fcd34d}
+.badge-ext{background:#2a1152;color:#c4b5fd}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+th{background:var(--surface);padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:2px solid var(--border)}
+td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top}
+tr:hover td{background:rgba(255,255,255,.02)}
+.file-path{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:monospace;font-size:12px;margin:8px 0;color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin:12px 0}
+.card h4{margin-top:0}
+.tier-row{display:grid;grid-template-columns:60px 100px 80px 60px 1fr;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.tier-row:last-child{border-bottom:none}
+.tier-num{font-weight:800;font-size:16px}
+.t0{color:#94a3b8}.t1{color:#60a5fa}.t2{color:#22c55e}.t3{color:#f59e0b}
+.mult{font-weight:700;font-size:13px}
+.note{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 6px 6px 0;margin:12px 0;font-size:13px}
+.warn{background:rgba(245,158,11,.08);border-left:3px solid var(--yellow);padding:10px 14px;border-radius:0 6px 6px 0;margin:12px 0;font-size:13px}
+.todo{background:rgba(239,68,68,.08);border-left:3px solid var(--red);padding:10px 14px;border-radius:0 6px 6px 0;margin:12px 0;font-size:13px}
+ul,ol{padding-left:20px;margin-bottom:12px}
+li{margin-bottom:4px;font-size:13px}
+.flow{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:monospace;font-size:11px;line-height:2;margin:12px 0;white-space:pre}
+</style>
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+<nav>
+  <div class="nav-group"><h2>ThreatAttest</h2></div>
+  <div class="nav-group">
+    <div class="nav-group-title">Overview</div>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#file-map">File Map</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">x/identity Module</div>
+    <ul>
+      <li><a href="#identity-types">Types</a></li>
+      <li><a href="#identity-msgs">Messages</a></li>
+      <li><a href="#identity-keeper">Keeper</a></li>
+      <li><a href="#identity-genesis">Genesis</a></li>
+      <li><a href="#identity-cli">CLI</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Attestation Changes</div>
+    <ul>
+      <li><a href="#attester-domain">attester_domain Field</a></li>
+      <li><a href="#tier-scaling">Tier Scaling</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Compliance Tiers</div>
+    <ul>
+      <li><a href="#tier-defs">Tier Definitions</a></li>
+      <li><a href="#tier-enforcement">Enforcement</a></li>
+      <li><a href="#tier-api">API</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Browser Extension</div>
+    <ul>
+      <li><a href="#ext-identity">Identity Badge</a></li>
+      <li><a href="#ext-api">API Changes</a></li>
+      <li><a href="#ext-popup">Popup UI</a></li>
+    </ul>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Integration</div>
+    <ul>
+      <li><a href="#wiring">App Wiring</a></li>
+      <li><a href="#production-notes">Production Notes</a></li>
+      <li><a href="#changelog">Changelog</a></li>
+    </ul>
+  </div>
+</nav>
+<main>
+  <h1>ThreatAttest <span>Identity Module</span> Implementation</h1>
+  <p class="subtitle">Complete implementation guide for x/identity, compliance tiers, attester identity fields, and browser extension DNS identity badges.</p>
+
+  <!-- ── Overview ─────────────────────────────────────────────────────────── -->
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>This document covers the four components implemented in this session:</p>
+    <ol>
+      <li><strong>x/identity module</strong> — full Cosmos SDK module scaffolding for DNS-anchored signer identities</li>
+      <li><strong>attester_domain / attester_selector fields</strong> — cross-reference attestations to the attester's DNS identity</li>
+      <li><strong>Browser extension DNS identity badges</strong> — show verified attester identity in the ThreatAttest Shield popup</li>
+      <li><strong>Compliance tier enforcement</strong> — scale attestation confidence by the attester's tier (0.25×–2.00×)</li>
+    </ol>
+    <p>All four components build directly on the DNSSEC-Anchored Signer Identity Protocol Specification (<a href="/dnssec-identity-spec.html" style="color:var(--accent)">TAT-IDP-001</a>).</p>
+  </section>
+
+  <!-- ── Architecture ──────────────────────────────────────────────────────── -->
+  <section id="architecture">
+    <h2>Architecture</h2>
+    <div class="flow">
+DNS TXT Records                  Cosmos Chain                    Browser Extension
+──────────────────────────────   ──────────────────────────────  ──────────────────────
+{sel}._tatkey.{domain}  TXT  ──► MsgRegisterIdentity            dns_identity.js
+_tatproof.{domain}      TXT  │   → x/identity keeper             resolveIdentity()
+_tatkey.{domain}        TXT  │   → DNSIdentityRecord              getIdentityBadge()
+                              │   → KV: idrecord/{addr}           
+                              │   → KV: iddomain/{domain}        popup.js
+                              │   → Trust score +200 RS           loadIdentityBadge()
+                              │   → Status: PENDING→ACTIVE         renderIdentityBadge()
+                              │                                   
+                              ├─► MsgPublishAttestation           background.js
+                              │   + attester_domain               checkNavigationURL()
+                              │   + attester_selector              → resolveIdentity()
+                              │   → confidence scaled by tier      → sendMessage(IDENTITY_BADGE)
+                              │   → AttesterTier stored in record 
+                              │                                   
+                              └─► x/identity/keeper/compliance.go
+                                  GetTier() → 0/1/2/3
+                                  ScaleConfidence(raw, tier)
+    </div>
+  </section>
+
+  <!-- ── File Map ──────────────────────────────────────────────────────────── -->
+  <section id="file-map">
+    <h2>File Map</h2>
+    <table>
+      <tr><th>File</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>x/identity/types/keys.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>KV store key prefixes and key builder functions</td></tr>
+      <tr><td><code>x/identity/types/types.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>DNSIdentityRecord, DNSIDStatus, DNSEvidenceBundle, GenesisState, domain helpers</td></tr>
+      <tr><td><code>x/identity/types/params.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>Module governance parameters with defaults and validation</td></tr>
+      <tr><td><code>x/identity/types/errors.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>Error codes 2–41 for input validation, lifecycle, auth, compliance</td></tr>
+      <tr><td><code>x/identity/types/msgs.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>MsgRegisterIdentity, MsgRotateIdentityKey, MsgRevokeIdentity, MsgRenewIdentity</td></tr>
+      <tr><td><code>x/identity/types/compliance.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>TierDefinitions, WeightedConfidence, TierRequirementsMet, TierEnforcementPolicy</td></tr>
+      <tr><td><code>x/identity/keeper/keeper.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>KV store CRUD, pending queue, expiry queue, iterators</td></tr>
+      <tr><td><code>x/identity/keeper/identity.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>RegisterIdentity, RotateIdentityKey, RevokeIdentity, RenewIdentity, EndBlocker helpers</td></tr>
+      <tr><td><code>x/identity/keeper/dns_verify.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>DNSSEC evidence bundle validation, TAT TXT record parser</td></tr>
+      <tr><td><code>x/identity/keeper/trust_score.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>Trust score CRUD, lifecycle adjustments, GetTier()</td></tr>
+      <tr><td><code>x/identity/keeper/compliance.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>GetTierInfo, ScaleConfidence, EnforceMinTier, TierBreakdown, AllTierThresholds</td></tr>
+      <tr><td><code>x/identity/module.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>AppModule, AppModuleBasic, EndBlock (expires identities)</td></tr>
+      <tr><td><code>x/identity/genesis.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>InitGenesis, ExportGenesis</td></tr>
+      <tr><td><code>x/identity/cli/tx.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>CLI: register-identity, rotate-identity-key, revoke-identity, renew-identity</td></tr>
+      <tr><td><code>x/identity/cli/query.go</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-go">Go</span></td><td>CLI: identity, identity-by-domain, identity-by-id, trust-score, tier, params, verify-domain-proof</td></tr>
+      <tr><td><code>x/attestation/types/types.go</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-go">Go</span></td><td>Added AttesterDomain, AttesterSelector, AttesterTier to AttestationRecord</td></tr>
+      <tr><td><code>x/attestation/msgs/msgs.go</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-go">Go</span></td><td>Added AttesterDomain, AttesterSelector to MsgPublishAttestation + ValidateBasic</td></tr>
+      <tr><td><code>x/attestation/keeper/msg_server.go</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-go">Go</span></td><td>Pass-through of domain/selector fields; tier scaling of confidence; helper functions</td></tr>
+      <tr><td><code>cmd/threatattestd/cmd/root.go</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-go">Go</span></td><td>Added --attester-domain and --attester-selector flags to publish-attest</td></tr>
+      <tr><td><code>threatattest-extension/src/dns_identity.js</code></td><td><span class="badge badge-new">NEW</span><span class="badge badge-js">JS</span></td><td>resolveIdentity(), getIdentityBadge(), buildIdentityBadge(), cache management</td></tr>
+      <tr><td><code>threatattest-extension/src/api.js</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-js">JS</span></td><td>Re-exports all identity functions from dns_identity.js</td></tr>
+      <tr><td><code>threatattest-extension/src/background.js</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-js">JS</span></td><td>Identity prefetch in checkNavigationURL(); GET_IDENTITY_BADGE message handler</td></tr>
+      <tr><td><code>threatattest-extension/popup.html</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-ext">EXT</span></td><td>Added identity badge section with tier display and details panel</td></tr>
+      <tr><td><code>threatattest-extension/popup.js</code></td><td><span class="badge badge-changed">MOD</span><span class="badge badge-ext">EXT</span></td><td>loadIdentityBadge(), renderIdentityBadge(), renderNoIdentity()</td></tr>
+    </table>
+  </section>
+
+  <!-- ── x/identity Types ──────────────────────────────────────────────────── -->
+  <section id="identity-types">
+    <h2>x/identity — Types</h2>
+
+    <h3>DNSIdentityRecord</h3>
+    <p>The canonical on-chain "identity block" stored at <code>idrecord/{cosmosAddr}</code>.</p>
+    <pre><code>type DNSIdentityRecord struct {
+    IdentityID        string       // SHA-256(cosmosAddr|"|"|domain|"|"|registeredAt)
+    CosmosAddr        string       // Cosmos bech32 address
+    Domain            string       // Normalized domain name
+    Selector          string       // DNS selector
+    PublicKeyHex      string       // Compressed secp256k1 pubkey (66 hex chars)
+    Name              string       // Human-readable name (optional)
+    URI               string       // Identity URI (optional, https://)
+    Flags             IdentityFlag // Bitmask: EXPERT, ORGANIZATION, GOVERNMENT, ...
+    Status            DNSIDStatus  // PENDING|ACTIVE|EXPIRED|REVOKED|DNS_REMOVED|SUPERSEDED
+    RegisteredAt      int64        // Unix timestamp (immutable)
+    LastVerifiedAt    int64        // Unix timestamp of last DNS re-verification
+    ExpiresAt         int64        // Unix timestamp of expiry
+    DomainProofSig    string       // ECDSA signature (128 hex chars)
+    Evidence          DNSEvidenceBundle
+    AttestationID     string       // Cross-ref to TATST:IDENTITY attestation
+    RegisteredAtBlock int64
+    PreviousSelector  string       // Populated during key rotation
+    RotatedAt         int64
+    RevocationNotes   string
+    SchemaVersion     int
+}</code></pre>
+
+    <h3>DNSIDStatus Lifecycle</h3>
+    <div class="flow">
+  MsgRegisterIdentity
+         │
+         ▼
+     [PENDING] ──── DNS epoch verification ────► [ACTIVE] ──── DNS removed ────► [DNS_REMOVED]
+                                                    │
+                              ┌─────────────────────┼─────────────────────┐
+                              ▼                     ▼                     ▼
+                          [EXPIRED]            [REVOKED]            [SUPERSEDED]
+                          (TTL elapsed)      (MsgRevokeIdentity)  (key rotation)
+                              │
+                          MsgRenewIdentity
+                              │
+                              ▼
+                          [ACTIVE]</div>
+
+    <h3>KV Store Layout</h3>
+    <table>
+      <tr><th>Prefix</th><th>Key</th><th>Value</th></tr>
+      <tr><td><code>0x00</code></td><td><code>idrecord/{cosmosAddr}</code></td><td>DNSIdentityRecord JSON</td></tr>
+      <tr><td><code>0x01</code></td><td><code>iddomain/{domain}</code></td><td>cosmosAddr string</td></tr>
+      <tr><td><code>0x02</code></td><td><code>idbyid/{identityID}</code></td><td>cosmosAddr string</td></tr>
+      <tr><td><code>0x03</code></td><td><code>idpending/{cosmosAddr}</code></td><td>DNSIdentityRecord JSON</td></tr>
+      <tr><td><code>0x04</code></td><td><code>idexpiry/{big-endian-ts}/{addr}</code></td><td>cosmosAddr string</td></tr>
+      <tr><td><code>0x05</code></td><td><code>params</code></td><td>Params JSON</td></tr>
+      <tr><td><code>0x10</code></td><td><code>trustscore/{cosmosAddr}</code></td><td>int64 JSON</td></tr>
+    </table>
+  </section>
+
+  <!-- ── Messages ──────────────────────────────────────────────────────────── -->
+  <section id="identity-msgs">
+    <h2>x/identity — Messages</h2>
+    <table>
+      <tr><th>Message</th><th>Auth</th><th>Key Effect</th><th>Trust Score</th></tr>
+      <tr><td><code>MsgRegisterIdentity</code></td><td>Tx signer == CosmosAddr</td><td>Creates PENDING record → promoted to ACTIVE on next epoch</td><td>+200 RS on activation</td></tr>
+      <tr><td><code>MsgRotateIdentityKey</code></td><td>Old key RotationAuthSig + New key NewKeyDomainProofSig</td><td>Updates Selector + PublicKeyHex; old selector archived</td><td>0 RS delta</td></tr>
+      <tr><td><code>MsgRevokeIdentity</code></td><td>Tx signer == CosmosAddr</td><td>Status → REVOKED (terminal)</td><td>−100 RS</td></tr>
+      <tr><td><code>MsgRenewIdentity</code></td><td>Tx signer == CosmosAddr</td><td>Extends ExpiresAt; updates Evidence; EXPIRED → ACTIVE</td><td>+10 RS</td></tr>
+    </table>
+
+    <h3>MsgRegisterIdentity — Required Fields</h3>
+    <pre><code>{
+  "cosmos_addr":      "cosmos1abc...",      // required: tx signer
+  "domain":           "example.com",        // required: normalized domain
+  "selector":         "tat2025a",           // required: DNS label
+  "public_key_hex":   "02a1b2c3...",        // required: 66-char hex secp256k1
+  "domain_proof_sig": "aabbcc...",          // required: 128-char hex ECDSA sig
+  "published_at":     1700000000,           // required: Unix ts (±5 min tolerance)
+  "evidence":         { ... },              // required when params.dns_bound_tier_requires_dnssec=true
+  "name":             "Example Corp",       // optional
+  "uri":              "https://...",        // optional, must be https://
+  "flags":            2,                    // optional: IdentityFlag bitmask
+  "ttl_seconds":      31536000              // optional: 0 = use params default
+}</code></pre>
+
+    <h3>Domain Proof Payload</h3>
+    <pre><code>// Pre-image:
+payload = "tatkey-domain-proof|" + domain + "|" + selector + "|" + cosmosAddr + "|" + registeredAt
+
+// The 32-byte SHA-256 digest of payload is signed by the secp256k1 key.
+// The hex-encoded 64-byte ECDSA signature is stored in domain_proof_sig.
+
+// Go:
+payload := types.DomainProofPayload(domain, selector, cosmosAddr, registeredAt)
+
+// CLI verification utility:
+threatattestd query identity verify-domain-proof \
+  --domain example.com --selector tat2025a \
+  --cosmos-addr cosmos1abc... --registered-at 1700000000</code></pre>
+  </section>
+
+  <!-- ── Keeper ──────────────────────────────────────────────────────────────── -->
+  <section id="identity-keeper">
+    <h2>x/identity — Keeper</h2>
+
+    <h3>keeper/keeper.go — CRUD API</h3>
+    <pre><code>// Record storage
+k.SetRecord(ctx, rec)                          // writes all three indexes
+k.GetRecord(ctx, cosmosAddr)                   // primary lookup
+k.GetRecordByDomain(ctx, domain)               // domain → record
+k.GetRecordByID(ctx, identityID)               // ID → record
+k.DeleteRecord(ctx, rec)                       // removes all indexes
+k.HasRecord(ctx, cosmosAddr) bool
+k.HasDomain(ctx, domain) bool
+
+// Pending queue (PENDING status records)
+k.SetPending(ctx, rec)
+k.GetPending(ctx, cosmosAddr)
+k.DeletePending(ctx, cosmosAddr)
+k.PromotePending(ctx, cosmosAddr, now)         // PENDING → ACTIVE
+
+// Expiry queue (sorted by timestamp)
+k.EnqueueExpiry(ctx, expiresAt, cosmosAddr)
+k.DequeueExpired(ctx, now) []string
+k.RemoveExpiryEntry(ctx, expiresAt, cosmosAddr)</code></pre>
+
+    <h3>keeper/identity.go — Business Logic</h3>
+    <pre><code>// Handlers (called from MsgServer)
+k.RegisterIdentity(ctx, msg)  → (DNSIdentityRecord, error)
+k.RotateIdentityKey(ctx, msg) → (DNSIdentityRecord, error)
+k.RevokeIdentity(ctx, msg)    → error
+k.RenewIdentity(ctx, msg)     → (DNSIdentityRecord, error)
+
+// EndBlocker
+k.ProcessExpiredIdentities(ctx) // marks expired records, emits events</code></pre>
+
+    <h3>keeper/dns_verify.go — DNSSEC Validation</h3>
+    <pre><code>// Full evidence bundle validation
+ValidateEvidenceBundle(bundle, domain, selector, pubKeyHex, cosmosAddr, now) error
+
+// Checks performed:
+//  1. Freshness: bundle.CollectedAt within MaxEvidenceAgeSeconds (3600 s)
+//  2. TXT records presence
+//  3. RRSIG algorithm allow-list (rejects RSASHA1/5)
+//  4. DNSKEY presence + algorithm + protocol==3
+//  5. DNSKEY RRSIG presence + algorithm
+//  6. DS record presence + digest_type==2
+//  7. TAT TXT record parse + cross-check (p=, a=, k= fields)
+//  8. RRSIG expiration check
+//  9. Full chain-of-trust (stub — ValidateDNSSECChain)</code></pre>
+
+    <div class="todo">
+      <strong>TODO (Production):</strong> Replace <code>ValidateDNSSECChain()</code> stub in <code>dns_verify.go</code> with full RFC 4035 chain-of-trust verification using <code>miekg/dns</code> or a dedicated DNSSEC validation library. The stub currently returns <code>nil</code> (passes all chain verifications) while all structural checks are fully implemented.
+    </div>
+
+    <h3>keeper/trust_score.go — Reputation Scores</h3>
+    <table>
+      <tr><th>Event</th><th>Function</th><th>Delta</th></tr>
+      <tr><td>Registration (PENDING→ACTIVE)</td><td><code>OnRegistration()</code></td><td><strong style="color:var(--green)">+200 RS</strong></td></tr>
+      <tr><td>30-day active milestone</td><td><code>OnMilestone30d()</code></td><td><strong style="color:var(--green)">+50 RS</strong></td></tr>
+      <tr><td>Annual renewal</td><td><code>OnRenewal()</code></td><td><strong style="color:var(--green)">+10 RS</strong></td></tr>
+      <tr><td>DNS key removed</td><td><code>OnDNSRemoved()</code></td><td><strong style="color:var(--red)">−200 RS</strong></td></tr>
+      <tr><td>Voluntary revocation</td><td><code>OnRevocation()</code></td><td><strong style="color:var(--red)">−100 RS</strong></td></tr>
+    </table>
+  </section>
+
+  <!-- ── Genesis ──────────────────────────────────────────────────────────── -->
+  <section id="identity-genesis">
+    <h2>x/identity — Genesis</h2>
+    <pre><code>// Default genesis state
+{
+  "params": {
+    "min_registration_stake":           1000000,   // 1 TAT
+    "identity_ttl_seconds":             31536000,  // 365 days
+    "dns_verification_epoch_blocks":    43200,     // ~24h at 2s/block
+    "max_domains_per_address":          5,
+    "expert_tier_min_reputation_score": 5000,
+    "staked_tier_min_delegation":       500000,    // 0.5 TAT
+    "dns_bound_tier_requires_dnssec":   true
+  },
+  "records": []
+}</code></pre>
+  </section>
+
+  <!-- ── CLI ────────────────────────────────────────────────────────────────── -->
+  <section id="identity-cli">
+    <h2>x/identity — CLI Reference</h2>
+
+    <h3>Transaction Commands</h3>
+    <pre><code># Register identity
+threatattestd tx identity register-identity \
+  --domain example.com \
+  --selector tat2025a \
+  --pubkey 02a1b2c3d4e5f6... \
+  --domain-proof-sig aabbccdd... \
+  --evidence-file evidence.json \
+  --name "Example Corp Security" \
+  --uri https://security.example.com \
+  --from mykey --chain-id threatattest-1
+
+# Rotate key (DKIM-style dual-selector handoff)
+threatattestd tx identity rotate-identity-key \
+  --new-selector tat2025b \
+  --new-pubkey 03d4e5f6... \
+  --rotation-auth-sig aabbcc... \   # signed by CURRENT key
+  --new-key-proof-sig ddeeff... \   # signed by NEW key
+  --evidence-file new_evidence.json \
+  --from mykey --chain-id threatattest-1
+
+# Revoke identity (permanent)
+threatattestd tx identity revoke-identity \
+  --reason "Key compromise" \
+  --from mykey --chain-id threatattest-1
+
+# Renew identity (extend TTL + refresh evidence)
+threatattestd tx identity renew-identity \
+  --evidence-file fresh_evidence.json \
+  --from mykey --chain-id threatattest-1</code></pre>
+
+    <h3>Query Commands</h3>
+    <pre><code># Query by address
+threatattestd query identity identity cosmos1abc...
+
+# Query by domain name
+threatattestd query identity identity-by-domain example.com
+
+# Query by identity ID
+threatattestd query identity identity-by-id a1b2c3d4...
+
+# Query trust score
+threatattestd query identity trust-score cosmos1abc...
+
+# Query compliance tier
+threatattestd query identity tier cosmos1abc...
+
+# Query module params
+threatattestd query identity params
+
+# Verify domain proof payload (off-chain utility)
+threatattestd query identity verify-domain-proof \
+  --domain example.com \
+  --selector tat2025a \
+  --cosmos-addr cosmos1abc... \
+  --registered-at 1700000000</code></pre>
+  </section>
+
+  <!-- ── attester_domain Field ─────────────────────────────────────────────── -->
+  <section id="attester-domain">
+    <h2>Attestation Changes — attester_domain / attester_selector</h2>
+    <p>Two optional fields have been added to <code>MsgPublishAttestation</code> and <code>AttestationRecord</code>:</p>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>attester_domain</code></td><td>string</td><td>Normalized domain of the attester's DNS identity. When set, the attestation is cross-referenced to the identity record at <code>idrecord/{attester}</code>.</td></tr>
+      <tr><td><code>attester_selector</code></td><td>string</td><td>DNS selector for the attester's active TAT key record at publish time.</td></tr>
+      <tr><td><code>attester_tier</code></td><td>int32 (record only)</td><td>Compliance tier (0–3) at publish time. Stored in the record; not a message field.</td></tr>
+    </table>
+
+    <h3>CLI Usage</h3>
+    <pre><code>threatattestd tx attestation publish-attest \
+  --artifact-type DOMAIN \
+  --raw-value malware.example.net \
+  --category TATST:MALWARE \
+  --confidence 90 \
+  --attester-domain myresearch.org \       # NEW: your DNS identity domain
+  --attester-selector tat2025a \           # NEW: your active selector
+  --from mykey --chain-id threatattest-1</code></pre>
+
+    <h3>Validation Rules</h3>
+    <ul>
+      <li>Both fields are optional. If one is set, the other is required.</li>
+      <li><code>attester_domain</code> must be a valid normalizable domain name.</li>
+      <li><code>attester_selector</code> must be a valid DNS label (≤63 chars, alnum+hyphen).</li>
+      <li>The keeper does not (currently) verify that the identity record exists at publish time — this is a stateless check. Stateful cross-reference verification is a production enhancement.</li>
+    </ul>
+  </section>
+
+  <!-- ── Tier Scaling ─────────────────────────────────────────────────────── -->
+  <section id="tier-scaling">
+    <h2>Attestation Changes — Tier-Scaled Confidence</h2>
+    <p>When an attestation is published, the raw <code>confidence</code> value is automatically scaled by the attester's compliance tier multiplier before being stored on-chain.</p>
+    <pre><code>// In x/attestation/keeper/msg_server.go:
+attesterTier := s.identityTier(ctx, msg.Attester)
+scaledConfidence := applyTierToConfidence(msg.Confidence, attesterTier)
+
+// Formula: scaled = raw * numerator / 4, clamped to [0, 100]
+// Tier 0 (ANONYMOUS): raw * 1/4  → max 25
+// Tier 1 (STAKED):    raw * 2/4  → max 50
+// Tier 2 (DNS_BOUND): raw * 4/4  → unchanged
+// Tier 3 (EXPERT):    raw * 8/4  → clamped to 100</code></pre>
+
+    <div class="note">
+      The <code>identityTier()</code> function currently returns 0 (ANONYMOUS) as a stub. To enable live tier scaling, inject the <code>x/identity</code> keeper into <code>x/attestation</code>'s MsgServer at app.go wiring time (see <a href="#wiring">App Wiring</a>).
+    </div>
+  </section>
+
+  <!-- ── Tier Definitions ─────────────────────────────────────────────────── -->
+  <section id="tier-defs">
+    <h2>Compliance Tiers — Definitions</h2>
+    <div class="card">
+      <div class="tier-row">
+        <div class="tier-num t0">0</div>
+        <div><strong>Anonymous</strong></div>
+        <div class="mult t0">0.25×</div>
+        <div>Max: 25</div>
+        <div>Default tier — no requirements. Any address can publish.</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-num t1">1</div>
+        <div><strong>Staked</strong></div>
+        <div class="mult t1">0.50×</div>
+        <div>Max: 50</div>
+        <div>Requires minimum token delegation (<code>params.staked_tier_min_delegation</code>). Demonstrates skin-in-the-game.</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-num t2">2</div>
+        <div><strong>DNS Bound</strong></div>
+        <div class="mult t2">1.00×</div>
+        <div>Max: 100</div>
+        <div>Requires an ACTIVE DNS-anchored identity. Full confidence weight — the standard tier for verified researchers.</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-num t3">3</div>
+        <div><strong>Expert</strong></div>
+        <div class="mult t3">2.00×</div>
+        <div>Max: 100</div>
+        <div>DNS identity + <code>IdentityFlag_EXPERT</code> + reputation ≥ <code>params.expert_tier_min_reputation_score</code>. Double weight, capped at 100.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tier Enforcement ──────────────────────────────────────────────────── -->
+  <section id="tier-enforcement">
+    <h2>Compliance Tiers — Enforcement</h2>
+
+    <h3>TierEnforcementPolicy</h3>
+    <pre><code>type TierEnforcementPolicy struct {
+    Enabled          bool
+    HardMinimumTier  ComplianceTier
+    CategoryMinimumTiers map[string]ComplianceTier
+}
+
+// Example: require Tier 2 for TATST:MALWARE attestations
+policy := TierEnforcementPolicy{
+    Enabled:         true,
+    HardMinimumTier: ComplianceTier_ANONYMOUS,
+    CategoryMinimumTiers: map[string]ComplianceTier{
+        "TATST:MALWARE":       ComplianceTier_DNS_BOUND,
+        "TATST:RANSOMWARE":    ComplianceTier_DNS_BOUND,
+        "TATST:APT":           ComplianceTier_EXPERT,
+    },
+}</code></pre>
+
+    <h3>Pure-Function Tier Determination</h3>
+    <pre><code>tier := TierRequirementsMet(
+    hasDNSIdentity: true,
+    identityActive: true,
+    expertFlag:     false,
+    trustScore:     350,
+    expertMinScore: 5000,
+    stakedMinScore: 500,
+)
+// → ComplianceTier_DNS_BOUND (Tier 2)</code></pre>
+  </section>
+
+  <!-- ── Tier API ──────────────────────────────────────────────────────────── -->
+  <section id="tier-api">
+    <h2>Compliance Tiers — API</h2>
+    <pre><code>// Keeper methods (x/identity/keeper/compliance.go)
+k.GetTier(ctx, cosmosAddr) ComplianceTier
+k.GetTierInfo(ctx, cosmosAddr) TierInfo
+k.ScaleConfidence(ctx, rawConfidence, cosmosAddr) int64
+k.EnforceMinTier(ctx, cosmosAddr, minTier) error
+k.TierBreakdown(ctx, cosmosAddr) string  // debug/CLI output
+
+// Pure functions (x/identity/types/compliance.go)
+WeightedConfidence(rawConfidence uint32, tier ComplianceTier) uint32
+WeightedScore(rawScore, maxValue int64, tier ComplianceTier) int64
+TierRequirementsMet(hasDNS, active, expert bool, score, expertMin, stakedMin int64) ComplianceTier
+GetTierDefinition(tier ComplianceTier) TierDefinition
+AllTierThresholds() []TierInfo
+
+// From x/attestation/keeper/msg_server.go
+applyTierToConfidence(rawConfidence uint32, tier int32) uint32
+ScaleConfidenceByTier(rawConfidence int64, tier ComplianceTier) int64</code></pre>
+  </section>
+
+  <!-- ── Extension Identity Badge ─────────────────────────────────────────── -->
+  <section id="ext-identity">
+    <h2>Browser Extension — Identity Badge</h2>
+    <p>The ThreatAttest Shield popup now displays a DNS identity badge for the current tab's domain. The badge is powered by <code>dns_identity.js</code> which fetches identity records from the chain REST API and caches them in memory.</p>
+
+    <h3>Badge States</h3>
+    <table>
+      <tr><th>State</th><th>Icon</th><th>CSS Class</th><th>Condition</th></tr>
+      <tr><td>Active (Tier 0)</td><td>👤</td><td><code>badge-identity-active tier-0</code></td><td>status=ACTIVE, tier=0</td></tr>
+      <tr><td>Active (Tier 1)</td><td>🔒</td><td><code>badge-identity-active tier-1</code></td><td>status=ACTIVE, tier=1</td></tr>
+      <tr><td>Active (Tier 2)</td><td>🌐</td><td><code>badge-identity-active tier-2</code></td><td>status=ACTIVE, tier=2</td></tr>
+      <tr><td>Active (Tier 3)</td><td>⭐</td><td><code>badge-identity-active tier-3</code></td><td>status=ACTIVE, tier=3</td></tr>
+      <tr><td>Pending</td><td>⏳</td><td><code>badge-identity-pending</code></td><td>status=PENDING</td></tr>
+      <tr><td>Expired</td><td>⚠️</td><td><code>badge-identity-expired</code></td><td>status=EXPIRED</td></tr>
+      <tr><td>Revoked</td><td>🚫</td><td><code>badge-identity-revoked</code></td><td>status=REVOKED or SUPERSEDED</td></tr>
+      <tr><td>DNS Removed</td><td>⛔</td><td><code>badge-identity-dns-removed</code></td><td>status=DNS_REMOVED</td></tr>
+      <tr><td>No Identity</td><td>❔</td><td><code>badge-no-identity</code></td><td>no record found</td></tr>
+    </table>
+
+    <h3>Cache Behaviour</h3>
+    <ul>
+      <li>Positive (found) entries cached for <strong>5 minutes</strong></li>
+      <li>Negative (not found) entries cached for <strong>2 minutes</strong></li>
+      <li>Cache invalidated on navigation to a new domain</li>
+      <li>Background prefetch fires on every navigation (fire-and-forget)</li>
+    </ul>
+  </section>
+
+  <!-- ── Extension API ─────────────────────────────────────────────────────── -->
+  <section id="ext-api">
+    <h2>Browser Extension — JavaScript API</h2>
+    <pre><code>// dns_identity.js exports
+import {
+  resolveIdentity,       // async (domain) → IdentityRecord|null
+  hasActiveIdentity,     // async (domain) → boolean
+  getIdentityBadge,      // async (domain) → IdentityBadge
+  buildIdentityBadge,    // (record|null) → IdentityBadge
+  prefetchIdentities,    // (domains[]) → void (fire-and-forget)
+  invalidateIdentityCache, // (domain) → void
+  clearIdentityCache,    // () → void
+  parseIdentityFlags,    // (flagsBitmask) → string[]
+  IdentityStatus,        // enum: ACTIVE, PENDING, EXPIRED, REVOKED, ...
+  ComplianceTiers,       // { 0: {label, multiplier, icon, class}, ... }
+  IdentityFlags,         // { EXPERT: 1, ORGANIZATION: 2, ... }
+} from './dns_identity.js';
+
+// Background message handlers
+chrome.runtime.sendMessage({ type: 'GET_IDENTITY_BADGE', domain: 'example.com' })
+  .then(({ badge }) => renderIdentityBadge(badge));
+
+chrome.runtime.sendMessage({ type: 'GET_IDENTITY_RECORD', domain: 'example.com' })
+  .then(({ record }) => console.log(record));
+
+chrome.runtime.sendMessage({ type: 'PREFETCH_IDENTITIES', domains: ['a.com', 'b.com'] });
+</code></pre>
+  </section>
+
+  <!-- ── Popup UI ──────────────────────────────────────────────────────────── -->
+  <section id="ext-popup">
+    <h2>Browser Extension — Popup UI</h2>
+    <p>The popup's new identity section appears between the page status bar and the threats list. It shows:</p>
+    <ul>
+      <li><strong>Identity icon</strong> — tier-appropriate emoji</li>
+      <li><strong>Identity label</strong> — name or status text</li>
+      <li><strong>Meta line</strong> — domain + expiry date</li>
+      <li><strong>Tier badge</strong> — icon, tier name, and multiplier (e.g. "🌐 DNS Bound 1.00×")</li>
+      <li><strong>Details panel</strong> (collapsible) — domain, cosmos address, selector, trust score, expiry, attestation ID</li>
+    </ul>
+
+    <h3>DOM IDs Added</h3>
+    <table>
+      <tr><th>ID</th><th>Element</th><th>Purpose</th></tr>
+      <tr><td><code>identity-section</code></td><td>div</td><td>Container (hidden until data loaded)</td></tr>
+      <tr><td><code>identity-badge</code></td><td>div</td><td>Badge container — class changes per state</td></tr>
+      <tr><td><code>identity-icon</code></td><td>div</td><td>Tier emoji</td></tr>
+      <tr><td><code>identity-label</code></td><td>div</td><td>Primary label text</td></tr>
+      <tr><td><code>identity-meta</code></td><td>div</td><td>Secondary meta line</td></tr>
+      <tr><td><code>identity-tier</code></td><td>div</td><td>Tier badge pill</td></tr>
+      <tr><td><code>identity-details-toggle</code></td><td>button</td><td>Show/hide details</td></tr>
+      <tr><td><code>identity-details</code></td><td>div</td><td>Expanded details panel</td></tr>
+      <tr><td><code>id-detail-domain</code></td><td>span</td><td>Domain field</td></tr>
+      <tr><td><code>id-detail-addr</code></td><td>span</td><td>Cosmos address (truncated)</td></tr>
+      <tr><td><code>id-detail-selector</code></td><td>span</td><td>Active selector</td></tr>
+      <tr><td><code>id-detail-score</code></td><td>span</td><td>Trust score (RS)</td></tr>
+      <tr><td><code>id-detail-expires</code></td><td>span</td><td>Expiry date</td></tr>
+      <tr><td><code>id-detail-attestation</code></td><td>span</td><td>Attestation ID (truncated)</td></tr>
+    </table>
+  </section>
+
+  <!-- ── App Wiring ─────────────────────────────────────────────────────────── -->
+  <section id="wiring">
+    <h2>App Wiring — Integration Guide</h2>
+    <p>To wire the <code>x/identity</code> module into your Cosmos SDK app (<code>app/app.go</code>):</p>
+    <pre><code>// 1. Instantiate the identity keeper
+app.IdentityKeeper = identitykeeper.NewKeeper(
+    keys[identitytypes.StoreKey],
+    appCodec,
+    app.BankKeeper,
+    app.StakingKeeper,
+)
+
+// 2. Register the module in ModuleManager
+app.ModuleManager = module.NewManager(
+    // ... existing modules ...
+    identity.NewAppModule(app.IdentityKeeper),
+)
+
+// 3. Add identity store key
+app.MountKVStores(keys)  // keys must include identitytypes.StoreKey
+
+// 4. Wire identity tier lookup into attestation's MsgServer
+// (add IdentityTierKeeper interface to attestation's MsgServer struct
+//  and inject app.IdentityKeeper here)
+
+// 5. Add identity module to BeginBlockers/EndBlockers order
+// EndBlock: identity module processes expired records</code></pre>
+
+    <div class="warn">
+      <strong>Import note:</strong> The <code>x/attestation</code> keeper uses an <code>IdentityTierKeeper</code> interface (not a direct import of <code>x/identity</code>) to avoid circular dependencies. Implement the interface at the app layer by wrapping <code>app.IdentityKeeper.GetTier()</code>.
+    </div>
+  </section>
+
+  <!-- ── Production Notes ──────────────────────────────────────────────────── -->
+  <section id="production-notes">
+    <h2>Production Notes</h2>
+
+    <h3>Stubs to Replace Before Production</h3>
+    <table>
+      <tr><th>File</th><th>Stub</th><th>Action</th></tr>
+      <tr><td><code>keeper/dns_verify.go</code></td><td><code>ValidateDNSSECChain()</code></td><td>Implement RFC 4035 chain-of-trust using <code>miekg/dns</code></td></tr>
+      <tr><td><code>keeper/identity.go</code></td><td><code>verifySecp256k1Sig()</code></td><td>Replace with <code>btcec.ParsePubKey</code> + <code>sig.Verify()</code></td></tr>
+      <tr><td><code>keeper/msg_server.go</code></td><td><code>identityTier()</code></td><td>Inject IdentityTierKeeper and call <code>k.GetTier(ctx, addr)</code></td></tr>
+      <tr><td><code>module.go</code></td><td>gRPC server registration</td><td>Add protobuf service definitions and register gRPC server</td></tr>
+    </table>
+
+    <h3>DNS Evidence Collection Script</h3>
+    <pre><code>#!/bin/bash
+# scripts/collect_evidence.sh — collect DNSSEC evidence bundle for registration
+# Usage: ./collect_evidence.sh example.com tat2025a > evidence.json
+
+DOMAIN=$1; SELECTOR=$2
+FQDN="${SELECTOR}._tatkey.${DOMAIN}"
+RESOLVER="8.8.8.8"  # Use a DNSSEC-validating resolver
+
+python3 - <<'PYEOF'
+import json, subprocess, sys, time
+
+domain = sys.argv[1] if len(sys.argv) > 1 else ""
+selector = sys.argv[2] if len(sys.argv) > 2 else ""
+fqdn = f"{selector}._tatkey.{domain}"
+
+bundle = {
+    "txt_records": [],
+    "txt_rrsigs": [],
+    "zone_dnskeys": [],
+    "dnskey_rrsigs": [],
+    "parent_ds": [],
+    "collected_at": int(time.time()),
+    "resolver": "8.8.8.8"
+}
+
+# Use dig to collect records (production: use miekg/dns Go resolver)
+for rtype in ["TXT", "RRSIG TXT", "DNSKEY", "RRSIG DNSKEY"]:
+    result = subprocess.run(
+        ["dig", "+dnssec", "+noall", "+answer", f"@8.8.8.8", fqdn, rtype],
+        capture_output=True, text=True
+    )
+    bundle["txt_records" if "TXT" in rtype else "zone_dnskeys"].append(result.stdout)
+
+print(json.dumps(bundle, indent=2))
+PYEOF</code></pre>
+  </section>
+
+  <!-- ── Changelog ─────────────────────────────────────────────────────────── -->
+  <section id="changelog">
+    <h2>Changelog</h2>
+    <table>
+      <tr><th>Component</th><th>Change</th></tr>
+      <tr><td>x/identity</td><td>NEW: Complete module scaffold (14 files)</td></tr>
+      <tr><td>x/attestation/types</td><td>ADDED: AttesterDomain, AttesterSelector, AttesterTier fields to AttestationRecord</td></tr>
+      <tr><td>x/attestation/msgs</td><td>ADDED: AttesterDomain, AttesterSelector to MsgPublishAttestation + ValidateBasic</td></tr>
+      <tr><td>x/attestation/keeper</td><td>ADDED: tier-scaled confidence; identityTier() + applyTierToConfidence() helpers</td></tr>
+      <tr><td>CLI</td><td>ADDED: --attester-domain, --attester-selector flags to publish-attest</td></tr>
+      <tr><td>Extension: dns_identity.js</td><td>NEW: resolveIdentity(), getIdentityBadge(), buildIdentityBadge(), cache, IdentityStatus, ComplianceTiers</td></tr>
+      <tr><td>Extension: api.js</td><td>ADDED: Re-exports all identity functions</td></tr>
+      <tr><td>Extension: background.js</td><td>ADDED: Identity prefetch on navigation; GET_IDENTITY_BADGE/RECORD/PREFETCH message handlers</td></tr>
+      <tr><td>Extension: popup.html</td><td>ADDED: Identity badge section with tier display, details panel, all DOM IDs</td></tr>
+      <tr><td>Extension: popup.js</td><td>ADDED: loadIdentityBadge(), renderIdentityBadge(), renderNoIdentity() functions</td></tr>
+    </table>
+  </section>
+</main>
+<script>
+// Highlight active nav link on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks  = document.querySelectorAll('nav a');
+const observer  = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`nav a[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

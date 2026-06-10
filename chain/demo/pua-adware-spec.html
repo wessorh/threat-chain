@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ThreatAttest — PUA, Phishing URL & Advertising Attestations</title>
+<style>
+:root {
+  --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+  --border: #30363d; --text: #c9d1d9; --muted: #8b949e;
+  --green: #3fb950; --blue: #58a6ff; --yellow: #d29922;
+  --orange: #f0883e; --red: #f85149; --purple: #bc8cff;
+  --pink: #ff7b72; --teal: #39d353; --cyan: #a5d6ff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; line-height: 1.7; font-size: 15px; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Layout */
+.sidebar { position: fixed; top: 0; left: 0; width: 260px; height: 100vh; overflow-y: auto; background: var(--bg2); border-right: 1px solid var(--border); padding: 20px 0; z-index: 100; }
+.sidebar h2 { color: var(--blue); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; padding: 0 20px 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar nav a { display: block; padding: 6px 20px; color: var(--muted); font-size: 13px; border-left: 3px solid transparent; transition: all .15s; }
+.sidebar nav a:hover, .sidebar nav a.active { color: var(--text); border-left-color: var(--blue); background: rgba(88,166,255,.07); text-decoration: none; }
+.sidebar nav .section { padding: 10px 20px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #444d56; }
+.content { margin-left: 260px; padding: 40px 48px; max-width: 1100px; }
+
+/* Header */
+.page-header { background: linear-gradient(135deg, #161b22 0%, #0d1117 100%); border: 1px solid var(--border); border-radius: 12px; padding: 40px; margin-bottom: 40px; }
+.page-header .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .5px; }
+.badge-new { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid rgba(63,185,80,.3); }
+.badge-schema { background: rgba(88,166,255,.15); color: var(--blue); border: 1px solid rgba(88,166,255,.3); }
+.badge-breaking { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid rgba(248,81,73,.3); }
+.page-header h1 { font-size: 32px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+.page-header .subtitle { color: var(--muted); font-size: 16px; }
+
+/* Sections */
+section { margin-bottom: 48px; scroll-margin-top: 20px; }
+section h2 { font-size: 22px; font-weight: 700; color: var(--blue); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+section h3 { font-size: 17px; font-weight: 600; color: var(--text); margin: 24px 0 12px; }
+section h4 { font-size: 14px; font-weight: 600; color: var(--muted); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+p { margin-bottom: 14px; color: var(--text); }
+
+/* Code blocks */
+pre { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px; overflow-x: auto; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 13px; line-height: 1.6; margin: 16px 0; }
+code { font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace; font-size: 13px; }
+:not(pre) > code { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; color: var(--cyan); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--bg3); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; padding: 10px 14px; text-align: left; border: 1px solid var(--border); }
+td { padding: 10px 14px; border: 1px solid var(--border); vertical-align: top; font-size: 14px; }
+tr:hover td { background: rgba(255,255,255,.02); }
+
+/* Cards */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin: 20px 0; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.card .card-icon { font-size: 28px; margin-bottom: 10px; }
+.card h3 { font-size: 16px; margin: 0 0 8px; color: var(--text); }
+.card p { font-size: 13px; color: var(--muted); margin: 0; }
+.card .chip { display: inline-block; margin-top: 10px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.chip-file { background: rgba(63,185,80,.15); color: var(--green); }
+.chip-url { background: rgba(88,166,255,.15); color: var(--blue); }
+.chip-domain { background: rgba(188,140,255,.15); color: var(--purple); }
+.chip-url-domain { background: linear-gradient(90deg, rgba(88,166,255,.15), rgba(188,140,255,.15)); color: var(--cyan); }
+
+/* Alert boxes */
+.alert { border-radius: 8px; padding: 16px 20px; margin: 16px 0; display: flex; gap: 14px; align-items: flex-start; }
+.alert-info { background: rgba(88,166,255,.1); border: 1px solid rgba(88,166,255,.3); }
+.alert-warn { background: rgba(210,153,34,.1); border: 1px solid rgba(210,153,34,.3); }
+.alert-success { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); }
+.alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.alert-body { font-size: 14px; color: var(--text); }
+.alert-body strong { display: block; margin-bottom: 4px; }
+
+/* Flow diagram */
+.flow { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin: 16px 0; }
+.flow-row { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+.flow-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; font-size: 13px; white-space: nowrap; }
+.flow-arrow { padding: 0 10px; color: var(--muted); font-size: 18px; }
+.flow-label { font-size: 11px; color: var(--muted); display: block; text-align: center; margin-top: 4px; }
+
+/* Highlight syntax colors */
+.kw { color: var(--pink); }
+.str { color: var(--green); }
+.cm { color: var(--muted); font-style: italic; }
+.num { color: var(--purple); }
+.ty { color: var(--orange); }
+.fn { color: var(--blue); }
+.field { color: var(--cyan); }
+
+/* Breadcrumb */
+.breadcrumb { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+.breadcrumb span { margin: 0 6px; }
+
+/* PUA behavior table */
+.behavior-table td:first-child { font-family: monospace; color: var(--cyan); font-size: 12px; white-space: nowrap; }
+.behavior-table td:nth-child(2) { color: var(--yellow); font-size: 12px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { margin-left: 0; padding: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ───────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <h2>ThreatAttest</h2>
+  <nav>
+    <span class="section">New Attestation Types</span>
+    <a href="#overview">Overview</a>
+    <a href="#categories">New Categories</a>
+    <a href="#artifact-domain">DOMAIN Artifact Type</a>
+    <span class="section">PUA Software</span>
+    <a href="#pua-intro">What is PUA?</a>
+    <a href="#pua-metadata">PUAMetadata Schema</a>
+    <a href="#pua-behaviors">Behavior Flags</a>
+    <a href="#pua-examples">PUA Examples</a>
+    <span class="section">Phishing URL & Site</span>
+    <a href="#phishing-url">PHISHING_URL</a>
+    <a href="#phishing-site">PHISHING_SITE</a>
+    <a href="#phishing-examples">Phishing Examples</a>
+    <span class="section">Advertising Abuse</span>
+    <a href="#adware">ADWARE Category</a>
+    <a href="#malvertising">MALVERTISING Category</a>
+    <a href="#adware-examples">Adware Examples</a>
+    <span class="section">Validation Rules</span>
+    <a href="#constraints">Category ↔ Artifact</a>
+    <a href="#validation-errors">Error Codes</a>
+    <span class="section">CLI Commands</span>
+    <a href="#cli-attest-file">attest-file (PUA)</a>
+    <a href="#cli-attest-url">attest-url</a>
+    <a href="#cli-attest-domain">attest-domain</a>
+    <span class="section">Browser Extension</span>
+    <a href="#ext-api">API Changes</a>
+    <a href="#ext-flow">Detection Flow</a>
+    <span class="section">Reference</span>
+    <a href="#all-categories">All Categories</a>
+    <a href="#all-artifacts">All Artifact Types</a>
+    <a href="#changelog">Changelog</a>
+  </nav>
+</aside>
+
+<!-- ── Content ──────────────────────────────────────────────────────────── -->
+<main class="content">
+
+<div class="breadcrumb">ThreatAttest Chain <span>›</span> Specification <span>›</span> PUA & Advertising Attestations</div>
+
+<div class="page-header">
+  <div class="badge-row">
+    <span class="badge badge-new">New in v1.1</span>
+    <span class="badge badge-schema">Schema v1</span>
+  </div>
+  <h1>PUA, Phishing URL & Advertising Attestations</h1>
+  <p class="subtitle">
+    Publish on-chain attestations for Potentially Unwanted Applications (PUA),
+    specific phishing URLs, entire phishing site domains, adware distribution domains,
+    and malvertising networks — with rich metadata and artifact-type enforcement.
+  </p>
+</div>
+
+<!-- ── Overview ─────────────────────────────────────────────────────────── -->
+<section id="overview">
+  <h2>Overview</h2>
+
+  <p>ThreatAttest v1.1 extends the attestation schema with three new threat
+  intelligence domains that were previously underserved by the original category
+  set:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-icon">⚠️</div>
+      <h3>PUA — Potentially Unwanted Application</h3>
+      <p>Software that is not outright malicious but exhibits unwanted, deceptive,
+      or privacy-invasive behaviour: bundled adware, browser hijackers, fake AV
+      tools, registry cleaners, toolbars, etc.</p>
+      <span class="chip chip-file">FILE artifact</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">🎣</div>
+      <h3>Phishing URL & Phishing Site</h3>
+      <p>Specific URLs serving phishing content (<code>PHISHING_URL</code>) or
+      entire domains operated as phishing platforms (<code>PHISHING_SITE</code>).
+      Complements the original <code>TATST:PHISHING</code> category with
+      finer-grained typing.</p>
+      <span class="chip chip-url-domain">URL or DOMAIN artifact</span>
+    </div>
+    <div class="card">
+      <div class="card-icon">📢</div>
+      <h3>Adware & Malvertising</h3>
+      <p>Domains and URLs that deliver intrusive or deceptive advertising
+      (<code>ADWARE</code>) or serve as malvertising infrastructure that
+      distributes malware through ad creatives or exploit-kit redirects
+      (<code>MALVERTISING</code>).</p>
+      <span class="chip chip-url-domain">URL or DOMAIN artifact</span>
+    </div>
+  </div>
+
+  <p>A new <strong>DOMAIN artifact type (4)</strong> is introduced alongside the
+  existing FILE (1), URL (2), and IPV4 (3) types. It allows attesting an entire
+  domain name — rather than a specific URL — as the artifact, which is the
+  natural representation for adware CDN domains, phishing-site operators, and
+  malvertising networks where the threat is domain-scoped rather than
+  path-specific.</p>
+</section>
+
+<!-- ── New Categories ───────────────────────────────────────────────────── -->
+<section id="categories">
+  <h2>New Threat Categories</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category Code</th>
+          <th>Icon</th>
+          <th>Label</th>
+          <th>Valid Artifact Types</th>
+          <th>Typical Severity</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>TATST:PUA</code></td>
+          <td>⚠️</td>
+          <td>PUA</td>
+          <td><span class="chip chip-file">FILE</span></td>
+          <td>LOW – MEDIUM</td>
+          <td>Potentially Unwanted Application. Executable / installer that exhibits
+          unwanted behaviour without being fully malicious.</td>
+        </tr>
+        <tr>
+          <td><code>TATST:PHISHING_URL</code></td>
+          <td>🎣</td>
+          <td>Phishing URL</td>
+          <td><span class="chip chip-url">URL</span> <span class="chip chip-domain">DOMAIN</span></td>
+          <td>HIGH</td>
+          <td>A specific URL path that serves a phishing page or redirects to one.</td>
+        </tr>
+        <tr>
+          <td><code>TATST:PHISHING_SITE</code></td>
+          <td>🎣</td>
+          <td>Phishing Site</td>
+          <td><span class="chip chip-url">URL</span> <span class="chip chip-domain">DOMAIN</span></td>
+          <td>HIGH</td>
+          <td>The entire domain is operated as a phishing platform, regardless of
+          specific path.</td>
+        </tr>
+        <tr>
+          <td><code>TATST:ADWARE</code></td>
+          <td>📢</td>
+          <td>Adware</td>
+          <td><span class="chip chip-url">URL</span> <span class="chip chip-domain">DOMAIN</span></td>
+          <td>LOW – MEDIUM</td>
+          <td>Domain or URL that distributes adware, browser-hijacking software, or
+          serves intrusive advertising without clear user consent.</td>
+        </tr>
+        <tr>
+          <td><code>TATST:MALVERTISING</code></td>
+          <td>🎯</td>
+          <td>Malvertising</td>
+          <td><span class="chip chip-url">URL</span> <span class="chip chip-domain">DOMAIN</span></td>
+          <td>MEDIUM – HIGH</td>
+          <td>Advertising network domain or landing URL used to distribute malware
+          through ad creatives, forced redirects, or exploit-kit delivery.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">ℹ️</span>
+    <div class="alert-body">
+      <strong>Backward compatibility</strong>
+      The original <code>TATST:PHISHING</code> category remains valid and unconstrained.
+      The new <code>PHISHING_URL</code> / <code>PHISHING_SITE</code> categories provide
+      <em>additional specificity</em> — you can combine them:
+      <code>["TATST:PHISHING", "TATST:PHISHING_SITE"]</code> on a DOMAIN artifact is valid
+      and encouraged when both classifications apply.
+    </div>
+  </div>
+</section>
+
+<!-- ── DOMAIN Artifact Type ──────────────────────────────────────────────── -->
+<section id="artifact-domain">
+  <h2>DOMAIN Artifact Type (4)</h2>
+
+  <p>The <code>ArtifactType_DOMAIN = 4</code> enum value represents a
+  <strong>bare, normalised domain name</strong> as the attested artifact.
+  The SHA-256 is computed over the normalised domain bytes, not over a full URL.</p>
+
+  <h3>When to use DOMAIN vs URL</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Scenario</th><th>Artifact Type</th><th>raw_value</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Specific phishing path: <code>https://evil.com/login/paypal</code></td>
+          <td><span class="chip chip-url">URL</span></td>
+          <td>Full URL string</td>
+        </tr>
+        <tr>
+          <td>Entire phishing domain: <code>evil.com</code></td>
+          <td><span class="chip chip-domain">DOMAIN</span></td>
+          <td>Bare domain: <code>evil.com</code></td>
+        </tr>
+        <tr>
+          <td>Adware CDN endpoint: <code>https://cdn.shady.com/ad.js</code></td>
+          <td><span class="chip chip-url">URL</span></td>
+          <td>Full URL string</td>
+        </tr>
+        <tr>
+          <td>Adware distribution domain: <code>shady.com</code></td>
+          <td><span class="chip chip-domain">DOMAIN</span></td>
+          <td>Bare domain: <code>shady.com</code></td>
+        </tr>
+        <tr>
+          <td>C2 domain (any subdomain malicious)</td>
+          <td><span class="chip chip-domain">DOMAIN</span></td>
+          <td>Apex or subdomain</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Domain Normalization</h3>
+  <p>The canonical form is computed by <code>types.NormalizeDomain()</code>:</p>
+  <pre><span class="cm">// Normalization steps (applied in order):</span>
+<span class="num">1.</span> Lowercase the entire input
+<span class="num">2.</span> Strip any scheme prefix (http://, https://)
+<span class="num">3.</span> Strip any path, query string, or fragment
+<span class="num">4.</span> Strip any port number
+<span class="num">5.</span> Strip leading "www." prefix
+<span class="num">6.</span> Validate: must have ≥ 2 labels, each label 1-63 chars
+
+<span class="cm">// Examples:</span>
+<span class="str">"www.Evil.Example.COM"</span>  → <span class="str">"evil.example.com"</span>
+<span class="str">"https://ads.cdn.evil.com/path?q=1"</span>  → <span class="str">"ads.cdn.evil.com"</span>
+<span class="str">"PHISHING-SITE.biz:443"</span>  → <span class="str">"phishing-site.biz"</span></pre>
+
+  <h3>SHA-256 Computation</h3>
+  <pre><span class="cm">// artifact_sha256 = hex(SHA-256(normalizedDomain_UTF8_bytes))</span>
+<span class="ty">normDomain</span>, _ := types.<span class="fn">NormalizeDomain</span>(<span class="str">"evil-ads.cdn.example"</span>)
+<span class="cm">// normDomain = "evil-ads.cdn.example"</span>
+<span class="ty">sha256hex</span> := types.<span class="fn">ArtifactSHA256ForDomain</span>(normDomain)
+<span class="cm">// sha256hex = hex(SHA-256(b"evil-ads.cdn.example"))</span></pre>
+
+  <div class="alert alert-warn">
+    <span class="alert-icon">⚠️</span>
+    <div class="alert-body">
+      <strong>raw_value is required for DOMAIN artifacts</strong>
+      Unlike FILE artifacts where <code>raw_value</code> is optional, DOMAIN attestations
+      require <code>raw_value</code> to be set to the domain string. The keeper
+      verifies that <code>artifact_sha256 == SHA-256(NormalizeDomain(raw_value))</code>.
+    </div>
+  </div>
+</section>
+
+<!-- ── PUA Intro ─────────────────────────────────────────────────────────── -->
+<section id="pua-intro">
+  <h2>PUA — Potentially Unwanted Application</h2>
+
+  <p>A Potentially Unwanted Application (PUA) is software that, while not
+  technically malware in the traditional sense, exhibits behaviour that most users
+  would consider undesirable, deceptive, or harmful to privacy. Common examples
+  include:</p>
+
+  <ul style="margin: 12px 0 16px 24px; color: var(--text);">
+    <li style="margin-bottom: 6px"><strong>Browser hijackers</strong> — change homepage, default search engine, or new-tab page without clear consent</li>
+    <li style="margin-bottom: 6px"><strong>Fake AV / scareware</strong> — tools that report false positives to coerce purchase of a "full version"</li>
+    <li style="margin-bottom: 6px"><strong>Bundled adware</strong> — legitimate software that silently installs advertising components</li>
+    <li style="margin-bottom: 6px"><strong>Unwanted toolbars</strong> — browser extensions bundled with free software installers</li>
+    <li style="margin-bottom: 6px"><strong>Deceptive registry cleaners</strong> — tools claiming to fix fabricated Windows registry issues</li>
+    <li style="margin-bottom: 6px"><strong>Covert cryptominers</strong> — CPU/GPU miners installed without explicit user knowledge</li>
+    <li style="margin-bottom: 6px"><strong>Data-harvesting freeware</strong> — software that sells user behaviour data without meaningful disclosure</li>
+  </ul>
+
+  <h3>PUA Constraint: FILE artifacts only</h3>
+  <p>The <code>TATST:PUA</code> category is <strong>constrained to
+  <code>ArtifactType_FILE</code></strong>. This is because PUA describes the
+  behaviour of an executable or installer — a binary artifact with a concrete
+  SHA-256. If you want to attest a <em>domain</em> that distributes PUA, use
+  <code>TATST:ADWARE</code> on a DOMAIN artifact instead.</p>
+</section>
+
+<!-- ── PUA Metadata ──────────────────────────────────────────────────────── -->
+<section id="pua-metadata">
+  <h2>PUAMetadata Schema</h2>
+
+  <p>When publishing a <code>TATST:PUA</code> attestation, the optional
+  <code>pua_info</code> field carries rich software metadata. This field is
+  <strong>only valid when <code>artifact_type == FILE</code></strong> and is
+  ignored (rejected) for any other artifact type.</p>
+
+  <pre><span class="kw">type</span> <span class="ty">PUAMetadata</span> <span class="kw">struct</span> {
+    <span class="cm">// SoftwareName is the display name (e.g. "SpeedBooster Pro")</span>
+    <span class="field">SoftwareName</span>    <span class="ty">string</span>      `json:<span class="str">"software_name,omitempty"</span>`
+
+    <span class="cm">// Vendor is the publisher / code-signing entity</span>
+    <span class="field">Vendor</span>          <span class="ty">string</span>      `json:<span class="str">"vendor,omitempty"</span>`
+
+    <span class="cm">// Version is the specific version where PUA behaviour was observed</span>
+    <span class="field">Version</span>         <span class="ty">string</span>      `json:<span class="str">"version,omitempty"</span>`
+
+    <span class="cm">// InstallerSHA256 is the SHA-256 of the installer bundle</span>
+    <span class="cm">// (may differ from the payload / extracted PE sha256)</span>
+    <span class="field">InstallerSHA256</span> <span class="ty">string</span>      `json:<span class="str">"installer_sha256,omitempty"</span>`
+
+    <span class="cm">// Behaviors is a bitmask of PUABehavior flags (see table below)</span>
+    <span class="field">Behaviors</span>       <span class="ty">PUABehavior</span> `json:<span class="str">"behaviors,omitempty"</span>`
+
+    <span class="cm">// BehaviorNotes — free-text elaboration (max 512 bytes, no HTML)</span>
+    <span class="field">BehaviorNotes</span>   <span class="ty">string</span>      `json:<span class="str">"behavior_notes,omitempty"</span>`
+
+    <span class="cm">// DetectionNames — cross-reference with AV/EDR detection names</span>
+    <span class="field">DetectionNames</span>  []<span class="ty">string</span>    `json:<span class="str">"detection_names,omitempty"</span>`
+}</pre>
+
+  <h3>JSON Example</h3>
+  <pre>{
+  <span class="field">"artifact_type"</span>:    <span class="str">"FILE"</span>,
+  <span class="field">"artifact_sha256"</span>:  <span class="str">"4a5b6c7d..."</span>,
+  <span class="field">"raw_value"</span>:        <span class="str">"SpeedBoosterPro_v3.2_setup.exe"</span>,
+  <span class="field">"severity"</span>:         <span class="str">"LOW"</span>,
+  <span class="field">"confidence"</span>:       <span class="num">88</span>,
+  <span class="field">"threat_categories"</span>: [<span class="str">"TATST:PUA"</span>],
+  <span class="field">"description"</span>:      <span class="str">"Installer bundles browser hijacker and covert cryptominer"</span>,
+  <span class="field">"pua_info"</span>: {
+    <span class="field">"software_name"</span>:   <span class="str">"SpeedBooster Pro"</span>,
+    <span class="field">"vendor"</span>:          <span class="str">"OptimiseSoft LLC"</span>,
+    <span class="field">"version"</span>:         <span class="str">"3.2.1"</span>,
+    <span class="field">"behaviors"</span>:       <span class="num">66</span>,
+    <span class="field">"behavior_notes"</span>:  <span class="str">"Installer deploys CoinMiner.JS; changes Chrome default search to ads.optsoft.com"</span>,
+    <span class="field">"detection_names"</span>: [<span class="str">"PUA.Win32.BrowserHijacker.SpeedBooster"</span>, <span class="str">"Adware.CoinMiner.JS"</span>]
+  }
+}</pre>
+</section>
+
+<!-- ── PUA Behaviors ─────────────────────────────────────────────────────── -->
+<section id="pua-behaviors">
+  <h2>PUABehavior Bitmask Flags</h2>
+
+  <p>The <code>PUABehavior</code> field is a bitmask — combine multiple flags with
+  bitwise OR. The value <code>66</code> in the example above is
+  <code>BUNDLED_ADWARE (1) | CRYPTOMINER_PUA (64) = 65</code> — wait, let's be precise:</p>
+
+  <div class="table-wrap">
+    <table class="behavior-table">
+      <thead>
+        <tr><th>Flag Name</th><th>Value (decimal)</th><th>Hex</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>NONE</td><td>0</td><td>0x000</td><td>No specific behaviour flags set</td></tr>
+        <tr><td>BUNDLED_ADWARE</td><td>1</td><td>0x001</td><td>Silently installs ad-injection components alongside the main software</td></tr>
+        <tr><td>BROWSER_HIJACK</td><td>2</td><td>0x002</td><td>Modifies browser homepage, new-tab page, or default search engine without clear consent</td></tr>
+        <tr><td>FAKE_AV</td><td>4</td><td>0x004</td><td>Reports false positives to coerce purchase or upgrade ("scareware")</td></tr>
+        <tr><td>REGISTRY_CLEANER</td><td>8</td><td>0x008</td><td>Deceptive registry optimiser claiming to fix fabricated issues</td></tr>
+        <tr><td>DATA_HARVESTING</td><td>16</td><td>0x010</td><td>Collects and exfiltrates user behaviour or PII without meaningful consent</td></tr>
+        <tr><td>TOOLBAR</td><td>32</td><td>0x020</td><td>Installs unwanted browser toolbar without clear user consent</td></tr>
+        <tr><td>CRYPTOMINER_PUA</td><td>64</td><td>0x040</td><td>Covertly uses CPU/GPU cycles for cryptocurrency mining</td></tr>
+        <tr><td>REMOTE_ACCESS</td><td>128</td><td>0x080</td><td>Includes undisclosed remote access capability (TeamViewer-style RAT-lite)</td></tr>
+        <tr><td>AUTORUN</td><td>256</td><td>0x100</td><td>Persists via Windows autorun, scheduled task, or startup folder without disclosure</td></tr>
+        <tr><td>BUNDLED_INSTALL</td><td>512</td><td>0x200</td><td>Silently installs additional third-party software during setup</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Example Combinations</h3>
+  <pre><span class="cm">// Browser hijacker + bundled adware: 1 + 2 = 3</span>
+<span class="field">"behaviors"</span>: <span class="num">3</span>
+
+<span class="cm">// Fake AV + data harvesting: 4 + 16 = 20</span>
+<span class="field">"behaviors"</span>: <span class="num">20</span>
+
+<span class="cm">// Covert miner + autorun + browser hijack: 64 + 256 + 2 = 322</span>
+<span class="field">"behaviors"</span>: <span class="num">322</span>
+
+<span class="cm">// Full spyware toolkit: all flags except NONE = 1+2+4+8+16+32+64+128+256+512 = 1023</span>
+<span class="field">"behaviors"</span>: <span class="num">1023</span></pre>
+</section>
+
+<!-- ── PUA Examples ───────────────────────────────────────────────────────── -->
+<section id="pua-examples">
+  <h2>PUA CLI Examples</h2>
+
+  <h3>Attest a PUA installer file</h3>
+  <pre><span class="cm"># Hash the file first</span>
+SHA=$(sha256sum SpeedBoosterPro_v3.2_setup.exe | awk '{print $1}')
+
+<span class="cm"># Publish attestation</span>
+threatattestd tx attestation publish \
+  --artifact-type FILE \
+  --artifact-sha256 $SHA \
+  --raw-value "SpeedBoosterPro_v3.2_setup.exe" \
+  --severity LOW \
+  --confidence 88 \
+  --ttl 2592000 \
+  --description "Installer bundles browser hijacker + covert cryptominer" \
+  --category "TATST:PUA" \
+  --from alice \
+  --chain-id threatattest-1 \
+  --fees 500utatst</pre>
+
+  <h3>Using attest-file convenience command</h3>
+  <pre>threatattestd attest-file SpeedBoosterPro_v3.2_setup.exe \
+  --severity LOW \
+  --confidence 88 \
+  --ttl 2592000 \
+  --description "Bundles browser hijacker and covert miner" \
+  --category "TATST:PUA" \
+  --output pua-attestation.json</pre>
+</section>
+
+<!-- ── Phishing URL ───────────────────────────────────────────────────────── -->
+<section id="phishing-url">
+  <h2>PHISHING_URL Category</h2>
+
+  <p><code>TATST:PHISHING_URL</code> is used when a <strong>specific URL
+  endpoint</strong> serves or redirects to a phishing page. The artifact is of
+  type <code>URL</code>, and the SHA-256 is computed over the normalized URL
+  (same normalization as other URL attestations: lowercase scheme/host, strip
+  default ports, sort query params, strip fragment).</p>
+
+  <h3>When PHISHING_URL differs from PHISHING</h3>
+  <p>The original <code>TATST:PHISHING</code> category is unconstrained and can
+  be applied to FILE, URL, IPV4, or DOMAIN artifacts. <code>PHISHING_URL</code>
+  explicitly signals that:</p>
+  <ul style="margin: 0 0 16px 24px;">
+    <li style="margin-bottom: 4px">The artifact is a URL</li>
+    <li style="margin-bottom: 4px">The phishing vector is URL-specific (a path, form, or redirect on that URL)</li>
+    <li style="margin-bottom: 4px">The rest of the domain may not be involved</li>
+  </ul>
+
+  <p>The browser extension queries for <code>PHISHING_URL</code> when checking
+  page URLs and applies a HIGH-severity warning regardless of the attestation's
+  recorded severity.</p>
+</section>
+
+<!-- ── Phishing Site ──────────────────────────────────────────────────────── -->
+<section id="phishing-site">
+  <h2>PHISHING_SITE Category</h2>
+
+  <p><code>TATST:PHISHING_SITE</code> attests that an <strong>entire domain</strong>
+  is operated as a phishing platform. Use a <code>DOMAIN</code> artifact type —
+  the normalized domain is the artifact, and the SHA-256 covers the domain bytes.
+  This category can also be applied to a URL artifact if the phishing operator is
+  identified by their URL structure.</p>
+
+  <div class="alert alert-success">
+    <span class="alert-icon">✅</span>
+    <div class="alert-body">
+      <strong>Browser extension behaviour</strong>
+      When the extension detects any navigation to a domain that has an active
+      <code>TATST:PHISHING_SITE</code> DOMAIN attestation, it immediately shows a
+      HIGH-priority "Phishing Site" banner with Block/Allow options, regardless
+      of the specific URL path being loaded.
+    </div>
+  </div>
+</section>
+
+<!-- ── Phishing Examples ─────────────────────────────────────────────────── -->
+<section id="phishing-examples">
+  <h2>Phishing CLI Examples</h2>
+
+  <h3>Attest a specific phishing URL</h3>
+  <pre>threatattestd attest-url "https://secure-verify.evil.example/login/paypal" \
+  --severity HIGH \
+  --confidence 95 \
+  --ttl 604800 \
+  --description "PayPal credential harvesting page" \
+  --category "TATST:PHISHING_URL" \
+  --output phishing-url.json</pre>
+
+  <h3>Attest a phishing site domain</h3>
+  <pre>threatattestd attest-domain "paypal-account-verify.phishinghost.example" \
+  --severity HIGH \
+  --confidence 97 \
+  --ttl 2592000 \
+  --description "Entire domain is a PayPal phishing platform; multiple /login/* paths observed" \
+  --category "TATST:PHISHING_SITE" \
+  --output phishing-site.json</pre>
+
+  <h3>Combined category attestation (URL)</h3>
+  <pre><span class="cm"># A URL that is both a phishing endpoint AND part of a phishing site</span>
+threatattestd tx attestation publish \
+  --artifact-type URL \
+  --raw-value "https://paypal-verify.evil.com/billing/update" \
+  --severity HIGH \
+  --confidence 94 \
+  --ttl 604800 \
+  --description "Phishing URL on known phishing domain" \
+  --category "TATST:PHISHING,TATST:PHISHING_URL" \
+  --from alice --fees 500utatst</pre>
+</section>
+
+<!-- ── Adware ─────────────────────────────────────────────────────────────── -->
+<section id="adware">
+  <h2>ADWARE Category</h2>
+
+  <p><code>TATST:ADWARE</code> covers domains and URLs associated with the
+  distribution of adware software or the delivery of intrusive/deceptive
+  advertising. This includes:</p>
+
+  <ul style="margin: 0 0 16px 24px; color: var(--text);">
+    <li style="margin-bottom: 6px">Download portals that bundle adware with legitimate software installers</li>
+    <li style="margin-bottom: 6px">CDN domains serving adware JavaScript payloads</li>
+    <li style="margin-bottom: 6px">Domains associated with browser-hijacking software distribution</li>
+    <li style="margin-bottom: 6px">Ad injection domains embedded in compromised websites</li>
+  </ul>
+
+  <p>Note that adware <em>software files</em> should use <code>TATST:PUA</code>
+  on a FILE artifact. <code>TATST:ADWARE</code> on DOMAIN/URL artifacts describes
+  the <em>infrastructure</em> side of the adware ecosystem.</p>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">ℹ️</span>
+    <div class="alert-body">
+      <strong>Severity guidance</strong>
+      Adware domains are typically attested at LOW–MEDIUM severity. If the adware
+      domain is also distributing malware (e.g. drive-by downloads), use
+      <code>TATST:ADWARE</code> combined with <code>TATST:MALWARE</code> and raise
+      severity to HIGH or CRITICAL accordingly.
+    </div>
+  </div>
+</section>
+
+<!-- ── Malvertising ───────────────────────────────────────────────────────── -->
+<section id="malvertising">
+  <h2>MALVERTISING Category</h2>
+
+  <p><code>TATST:MALVERTISING</code> covers advertising infrastructure domains and
+  URLs that have been observed distributing malware through ad creatives, forced
+  redirects, or exploit-kit delivery chains. Malvertising is distinct from adware
+  in that:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Aspect</th><th>ADWARE</th><th>MALVERTISING</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Primary risk</td>
+          <td>Unwanted software installation, intrusive ads</td>
+          <td>Malware delivery, exploit-kit landing</td>
+        </tr>
+        <tr>
+          <td>Severity</td>
+          <td>LOW – MEDIUM</td>
+          <td>MEDIUM – HIGH</td>
+        </tr>
+        <tr>
+          <td>Typical victim action</td>
+          <td>Clicks install or visits domain</td>
+          <td>Passive — drive-by via ad impression</td>
+        </tr>
+        <tr>
+          <td>Infrastructure type</td>
+          <td>Download portals, PUA bundlers</td>
+          <td>Ad networks, CDNs, redirect chains</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Adware Examples ───────────────────────────────────────────────────── -->
+<section id="adware-examples">
+  <h2>Adware & Malvertising CLI Examples</h2>
+
+  <h3>Attest an adware distribution domain</h3>
+  <pre>threatattestd attest-domain "downloads.free-toolbar-installer.example" \
+  --severity MEDIUM \
+  --confidence 85 \
+  --ttl 2592000 \
+  --description "Downloads bundled adware toolbars and browser hijackers via NSIS installers" \
+  --category "TATST:ADWARE" \
+  --output adware-domain.json</pre>
+
+  <h3>Attest a malvertising CDN domain</h3>
+  <pre>threatattestd attest-domain "ad-cdn.malvertising-network.example" \
+  --severity HIGH \
+  --confidence 90 \
+  --ttl 604800 \
+  --description "Ad CDN serving exploit-kit payloads via malicious creatives" \
+  --category "TATST:MALVERTISING" \
+  --output malvertising-domain.json</pre>
+
+  <h3>Attest a malvertising URL (specific endpoint)</h3>
+  <pre>threatattestd attest-url "https://ad-serve.shady-network.example/redir?id=exploit" \
+  --severity HIGH \
+  --confidence 88 \
+  --ttl 86400 \
+  --description "Forced redirect URL delivering Angler exploit kit" \
+  --category "TATST:MALVERTISING,TATST:EXPLOIT" \
+  --output malvertising-url.json</pre>
+
+  <h3>Combined: adware file + distribution domain</h3>
+  <pre><span class="cm"># First attest the installer file as PUA</span>
+threatattestd attest-file FreeVideoConverter_setup.exe \
+  --severity LOW \
+  --category "TATST:PUA" \
+  --description "Bundles 3 adware components; distributed via adware-portal.example"
+
+<span class="cm"># Then attest the distribution domain as ADWARE</span>
+threatattestd attest-domain "adware-portal.example" \
+  --severity MEDIUM \
+  --category "TATST:ADWARE" \
+  --description "Primary distribution domain for FreeVideoConverter PUA family"</pre>
+</section>
+
+<!-- ── Constraints ───────────────────────────────────────────────────────── -->
+<section id="constraints">
+  <h2>Category ↔ Artifact Type Constraints</h2>
+
+  <p>The chain enforces category-to-artifact-type constraints at the
+  <code>ValidateBasic</code> level. Attempting to publish a constrained category
+  with an invalid artifact type will be rejected with error code 46
+  (<code>ErrCategoryArtifactMismatch</code>).</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>FILE (1)</th>
+          <th>URL (2)</th>
+          <th>IPV4 (3)</th>
+          <th>DOMAIN (4)</th>
+          <th>Constraint source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>TATST:MALWARE</code></td>
+          <td>✅</td><td>✅</td><td>✅</td><td>✅</td>
+          <td>Unconstrained</td>
+        </tr>
+        <tr>
+          <td><code>TATST:PHISHING</code></td>
+          <td>✅</td><td>✅</td><td>✅</td><td>✅</td>
+          <td>Unconstrained (legacy)</td>
+        </tr>
+        <tr>
+          <td><code>TATST:C2</code> … <code>TATST:BACKDOOR</code></td>
+          <td>✅</td><td>✅</td><td>✅</td><td>✅</td>
+          <td>Unconstrained</td>
+        </tr>
+        <tr style="background: rgba(63,185,80,.05);">
+          <td><code>TATST:PUA</code></td>
+          <td>✅</td><td>❌</td><td>❌</td><td>❌</td>
+          <td><code>CategoryArtifactConstraints["TATST:PUA"]</code></td>
+        </tr>
+        <tr style="background: rgba(88,166,255,.05);">
+          <td><code>TATST:PHISHING_URL</code></td>
+          <td>❌</td><td>✅</td><td>❌</td><td>✅</td>
+          <td><code>CategoryArtifactConstraints["TATST:PHISHING_URL"]</code></td>
+        </tr>
+        <tr style="background: rgba(88,166,255,.05);">
+          <td><code>TATST:PHISHING_SITE</code></td>
+          <td>❌</td><td>✅</td><td>❌</td><td>✅</td>
+          <td><code>CategoryArtifactConstraints["TATST:PHISHING_SITE"]</code></td>
+        </tr>
+        <tr style="background: rgba(188,140,255,.05);">
+          <td><code>TATST:ADWARE</code></td>
+          <td>❌</td><td>✅</td><td>❌</td><td>✅</td>
+          <td><code>CategoryArtifactConstraints["TATST:ADWARE"]</code></td>
+        </tr>
+        <tr style="background: rgba(188,140,255,.05);">
+          <td><code>TATST:MALVERTISING</code></td>
+          <td>❌</td><td>✅</td><td>❌</td><td>✅</td>
+          <td><code>CategoryArtifactConstraints["TATST:MALVERTISING"]</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Validation implementation</h3>
+  <pre><span class="cm">// types/types.go</span>
+<span class="kw">func</span> <span class="fn">IsCategoryValidForArtifact</span>(cat <span class="ty">string</span>, at <span class="ty">ArtifactType</span>) <span class="ty">bool</span> {
+    allowed, constrained := <span class="ty">CategoryArtifactConstraints</span>[cat]
+    <span class="kw">if</span> !constrained {
+        <span class="kw">return</span> <span class="num">true</span>  <span class="cm">// unconstrained categories always pass</span>
+    }
+    <span class="kw">for</span> _, a := <span class="kw">range</span> allowed {
+        <span class="kw">if</span> a == at { <span class="kw">return</span> <span class="num">true</span> }
+    }
+    <span class="kw">return</span> <span class="num">false</span>
+}
+
+<span class="cm">// msgs/msgs.go — ValidateBasic loop</span>
+<span class="kw">for</span> _, cat := <span class="kw">range</span> m.ThreatCategories {
+    <span class="kw">if</span> !types.<span class="fn">IsCategoryValidForArtifact</span>(cat, m.ArtifactType) {
+        <span class="kw">return</span> types.ErrCategoryArtifactMismatch
+    }
+}</pre>
+</section>
+
+<!-- ── Validation Errors ─────────────────────────────────────────────────── -->
+<section id="validation-errors">
+  <h2>New Error Codes</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Sentinel</th><th>Message</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>45</td><td><code>ErrInvalidDomain</code></td><td>raw_value is not a valid domain name</td></tr>
+        <tr><td>46</td><td><code>ErrCategoryArtifactMismatch</code></td><td>threat_category is not valid for the specified artifact_type</td></tr>
+        <tr><td>47</td><td><code>ErrPUARequiresFile</code></td><td>TATST:PUA category requires ArtifactType FILE</td></tr>
+        <tr><td>48</td><td><code>ErrAdwareRequiresDomainOrURL</code></td><td>TATST:ADWARE/MALVERTISING category requires ArtifactType URL or DOMAIN</td></tr>
+        <tr><td>49</td><td><code>ErrPhishingURLRequiresDomainOrURL</code></td><td>TATST:PHISHING_URL/PHISHING_SITE category requires ArtifactType URL or DOMAIN</td></tr>
+        <tr><td>50</td><td><code>ErrPUABehaviorNotesToolong</code></td><td>pua_info.behavior_notes exceeds 512 bytes</td></tr>
+        <tr><td>51</td><td><code>ErrPUAInfoOnNonFile</code></td><td>pua_info may only be set when artifact_type is FILE</td></tr>
+        <tr><td>52</td><td><code>ErrDomainSHA256Mismatch</code></td><td>artifact_sha256 does not match sha256(normalized_domain)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── CLI attest-file ───────────────────────────────────────────────────── -->
+<section id="cli-attest-file">
+  <h2>CLI: attest-file (PUA flags)</h2>
+
+  <p>The existing <code>attest-file</code> command now accepts PUA-specific flags
+  when the category includes <code>TATST:PUA</code>:</p>
+
+  <pre>threatattestd attest-file [file] \
+  --severity <LEVEL> \
+  --confidence <0-100> \
+  --ttl <seconds> \
+  --description <text> \
+  --category "TATST:PUA" \
+  <span class="cm"># PUA-specific flags (all optional):</span>
+  --pua-software-name  <name>       <span class="cm"># Display name of the software</span>
+  --pua-vendor         <vendor>     <span class="cm"># Publisher / code-signing entity</span>
+  --pua-version        <version>    <span class="cm"># Version string</span>
+  --pua-behavior-notes <text>       <span class="cm"># Free-text behaviour description (max 512 bytes)</span>
+  --pua-detection-names <n1,n2>    <span class="cm"># Comma-separated AV detection names</span>
+  --output             <file.json>  <span class="cm"># Output spec file</span></pre>
+</section>
+
+<!-- ── CLI attest-url ────────────────────────────────────────────────────── -->
+<section id="cli-attest-url">
+  <h2>CLI: attest-url (new command)</h2>
+
+  <p>The new <code>attest-url</code> command is a convenience wrapper for URL
+  attestations with phishing/malvertising categories pre-configured:</p>
+
+  <pre>threatattestd attest-url [url] [flags]
+
+Flags:
+  --severity           <LEVEL>      Severity (default MEDIUM)
+  --confidence         <0-100>      Confidence score (default 85)
+  --ttl                <seconds>    TTL (default 604800 = 7 days)
+  --description        <text>       Description (max 1024 bytes)
+  --category           <cat,...>    Threat categories (default TATST:PHISHING_URL)
+  --tags               <tag,...>    Tags
+  --attester           <addr>       Bech32 attester address
+  --output             <file.json>  Output file (default url-attestation.json)
+  --chain-id           <id>         Chain ID (default threatattest-1)
+  --dry-run                         Print spec without writing</pre>
+</section>
+
+<!-- ── CLI attest-domain ─────────────────────────────────────────────────── -->
+<section id="cli-attest-domain">
+  <h2>CLI: attest-domain (new command)</h2>
+
+  <p>The new <code>attest-domain</code> command creates DOMAIN artifact
+  attestations, optimized for adware/malvertising/phishing-site use cases:</p>
+
+  <pre>threatattestd attest-domain [domain] [flags]
+
+Flags:
+  --severity           <LEVEL>      Severity (default MEDIUM)
+  --confidence         <0-100>      Confidence score (default 80)
+  --ttl                <seconds>    TTL (default 2592000 = 30 days)
+  --description        <text>       Description (max 1024 bytes)
+  --category           <cat,...>    Threat categories (default TATST:ADWARE)
+  --tags               <tag,...>    Tags
+  --attester           <addr>       Bech32 attester address
+  --output             <file.json>  Output file (default domain-attestation.json)
+  --chain-id           <id>         Chain ID (default threatattest-1)
+  --dry-run                         Print spec without writing
+
+The command prints the normalized domain and its SHA-256 alongside the
+Next Steps instructions for broadcasting via 'tx attestation publish'.</pre>
+</section>
+
+<!-- ── Extension API ─────────────────────────────────────────────────────── -->
+<section id="ext-api">
+  <h2>Browser Extension: API Changes</h2>
+
+  <h3>New exports from api.js</h3>
+  <pre><span class="cm">// New ARTIFACT_TYPE entry</span>
+<span class="kw">export const</span> ARTIFACT_TYPE = { <span class="num">4</span>: <span class="str">"DOMAIN"</span>, ... };
+
+<span class="cm">// New category metadata map</span>
+<span class="kw">export const</span> THREAT_CATEGORIES = {
+  <span class="str">"TATST:PUA"</span>:          { label: <span class="str">"PUA"</span>,           icon: <span class="str">"⚠️"</span>,  artifacts: [<span class="str">"FILE"</span>],          severity: <span class="num">2</span> },
+  <span class="str">"TATST:PHISHING_URL"</span>:  { label: <span class="str">"Phishing URL"</span>,  icon: <span class="str">"🎣"</span>, artifacts: [<span class="str">"URL"</span>,<span class="str">"DOMAIN"</span>],  severity: <span class="num">4</span> },
+  <span class="str">"TATST:PHISHING_SITE"</span>: { label: <span class="str">"Phishing Site"</span>, icon: <span class="str">"🎣"</span>, artifacts: [<span class="str">"URL"</span>,<span class="str">"DOMAIN"</span>],  severity: <span class="num">4</span> },
+  <span class="str">"TATST:ADWARE"</span>:        { label: <span class="str">"Adware"</span>,        icon: <span class="str">"📢"</span>, artifacts: [<span class="str">"URL"</span>,<span class="str">"DOMAIN"</span>],  severity: <span class="num">2</span> },
+  <span class="str">"TATST:MALVERTISING"</span>:  { label: <span class="str">"Malvertising"</span>,  icon: <span class="str">"🎯"</span>, artifacts: [<span class="str">"URL"</span>,<span class="str">"DOMAIN"</span>],  severity: <span class="num">3</span> },
+  ...
+};
+
+<span class="cm">// New utility functions</span>
+<span class="kw">export function</span> <span class="fn">categoryLabel</span>(code: string): string
+<span class="kw">export function</span> <span class="fn">categoryIcon</span>(code: string): string
+<span class="kw">export function</span> <span class="fn">normalizeDomain</span>(domain: string): string | null
+<span class="kw">export async function</span> <span class="fn">checkDomain</span>(rawDomain: string): Promise<result | null></pre>
+
+  <h3>checkDomain() internals</h3>
+  <pre><span class="cm">// checkDomain(rawDomain)</span>
+<span class="num">1.</span> normalizeDomain(rawDomain) — lowercase, strip www., strip path/port/scheme
+<span class="num">2.</span> Cache lookup: key = "domain:{normalizedDomain}"
+<span class="num">3.</span> SHA-256(normalizedDomain) via Web Crypto API
+<span class="num">4.</span> isMaliciousBySHA256(domainSHA256) — same chain REST call as file lookups
+<span class="num">5.</span> Cache result for 5 minutes
+<span class="num">6.</span> Return null if clean / error</pre>
+</section>
+
+<!-- ── Extension Flow ─────────────────────────────────────────────────────── -->
+<section id="ext-flow">
+  <h2>Browser Extension: Detection Flow</h2>
+
+  <h3>Navigation URL check (updated)</h3>
+  <div class="flow">
+    <div style="margin-bottom: 16px;">
+      <div class="flow-row">
+        <div class="flow-box">User navigates to URL</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">onBeforeRequest fires</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">checkNavigationURL(url, tabId)</div>
+      </div>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <div class="flow-row">
+        <div class="flow-box" style="border-color: var(--blue);">① checkURL(fullURL)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">isMalicious? URL artifact</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">PHISHING / C2 / MALWARE etc.</div>
+      </div>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <div class="flow-row">
+        <div class="flow-box" style="border-color: var(--purple);">② checkDomain(hostname) <span style="color: var(--green); font-size: 11px">NEW</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">isMalicious? DOMAIN artifact</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">ADWARE / MALVERTISING / PHISHING_SITE</div>
+      </div>
+    </div>
+    <div>
+      <div class="flow-row">
+        <div class="flow-box" style="border-color: var(--muted);">③ checkIPv4(hostname) if IP</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">isMalicious? IPV4 artifact</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">C2 / SCANNER / BOTNET etc.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Download threat check (updated)</h3>
+  <div class="flow">
+    <div style="margin-bottom: 16px;">
+      <div class="flow-row">
+        <div class="flow-box">Download completes</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">① checkURL(downloadURL)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">URL artifact lookup</div>
+      </div>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <div class="flow-row">
+        <div class="flow-box" style="border-color: var(--purple);">② checkDomain(downloadHost) <span style="color: var(--green); font-size: 11px">NEW</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">DOMAIN artifact lookup</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Flags adware distribution domains</div>
+      </div>
+    </div>
+    <div>
+      <div class="flow-row">
+        <div class="flow-box">③ hashDownloadedFile(dl)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">checkFileSHA256(sha256)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">FILE artifact lookup (PUA / MALWARE)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── All Categories ────────────────────────────────────────────────────── -->
+<section id="all-categories">
+  <h2>All Threat Categories (Complete Reference)</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>Label</th><th>Constrained To</th><th>Since</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>TATST:MALWARE</code></td><td>Malware</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:PHISHING</code></td><td>Phishing</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:C2</code></td><td>C2</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:CRYPTOMINER</code></td><td>Cryptominer</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:RANSOMWARE</code></td><td>Ransomware</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:EXPLOIT</code></td><td>Exploit</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:SCANNER</code></td><td>Scanner</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:SPAM</code></td><td>Spam</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:BOTNET</code></td><td>Botnet</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:INFOSTEALER</code></td><td>Infostealer</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:DROPPER</code></td><td>Dropper</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>TATST:BACKDOOR</code></td><td>Backdoor</td><td>Any</td><td>v1.0</td></tr>
+        <tr style="background: rgba(63,185,80,.04);"><td><code>TATST:PUA</code></td><td>PUA</td><td>FILE only</td><td><strong>v1.1</strong></td></tr>
+        <tr style="background: rgba(88,166,255,.04);"><td><code>TATST:PHISHING_URL</code></td><td>Phishing URL</td><td>URL, DOMAIN</td><td><strong>v1.1</strong></td></tr>
+        <tr style="background: rgba(88,166,255,.04);"><td><code>TATST:PHISHING_SITE</code></td><td>Phishing Site</td><td>URL, DOMAIN</td><td><strong>v1.1</strong></td></tr>
+        <tr style="background: rgba(188,140,255,.04);"><td><code>TATST:ADWARE</code></td><td>Adware</td><td>URL, DOMAIN</td><td><strong>v1.1</strong></td></tr>
+        <tr style="background: rgba(188,140,255,.04);"><td><code>TATST:MALVERTISING</code></td><td>Malvertising</td><td>URL, DOMAIN</td><td><strong>v1.1</strong></td></tr>
+        <tr><td><code>TA####</code></td><td>MITRE Tactic</td><td>Any</td><td>v1.0</td></tr>
+        <tr><td><code>T####[.###]</code></td><td>MITRE Technique</td><td>Any</td><td>v1.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── All Artifact Types ─────────────────────────────────────────────────── -->
+<section id="all-artifacts">
+  <h2>All Artifact Types (Complete Reference)</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Enum Value</th><th>Name</th><th>raw_value</th><th>SHA-256 computation</th><th>Since</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>UNSPECIFIED</td><td>—</td><td>—</td><td>v1.0</td></tr>
+        <tr><td>1</td><td>FILE</td><td>Optional (filename hint)</td><td>SHA-256 of raw file bytes</td><td>v1.0</td></tr>
+        <tr><td>2</td><td>URL</td><td>Required (full URL string)</td><td>SHA-256(NormalizeURL(rawValue))</td><td>v1.0</td></tr>
+        <tr><td>3</td><td>IPV4</td><td>Required (dotted-decimal IP)</td><td>SHA-256(ipString_UTF8_bytes)</td><td>v1.0</td></tr>
+        <tr style="background: rgba(188,140,255,.04);"><td>4</td><td><strong>DOMAIN</strong></td><td>Required (bare domain name)</td><td>SHA-256(NormalizeDomain(rawValue))</td><td><strong>v1.1</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Changelog ─────────────────────────────────────────────────────────── -->
+<section id="changelog">
+  <h2>Changelog</h2>
+
+  <h3>v1.1 — Current Release</h3>
+  <div class="alert alert-success">
+    <span class="alert-icon">✅</span>
+    <div class="alert-body">
+      <strong>New in v1.1</strong>
+      <ul style="margin-top: 8px; padding-left: 20px;">
+        <li><code>ArtifactType_DOMAIN = 4</code> — bare domain name artifact type</li>
+        <li><code>TATST:PUA</code> — Potentially Unwanted Application category (FILE only)</li>
+        <li><code>TATST:PHISHING_URL</code> — specific phishing URL category (URL, DOMAIN)</li>
+        <li><code>TATST:PHISHING_SITE</code> — entire phishing site category (URL, DOMAIN)</li>
+        <li><code>TATST:ADWARE</code> — adware distribution domain/URL category (URL, DOMAIN)</li>
+        <li><code>TATST:MALVERTISING</code> — malvertising infrastructure category (URL, DOMAIN)</li>
+        <li><code>PUAMetadata</code> struct with <code>PUABehavior</code> bitmask flags</li>
+        <li><code>CategoryArtifactConstraints</code> validation map</li>
+        <li><code>IsCategoryValidForArtifact()</code> helper</li>
+        <li><code>NormalizeDomain()</code> and <code>ArtifactSHA256ForDomain()</code> utilities</li>
+        <li>Error codes 45–52 for new validation scenarios</li>
+        <li>CLI: <code>attest-url</code> convenience command</li>
+        <li>CLI: <code>attest-domain</code> convenience command</li>
+        <li>CLI: PUA flags for <code>attest-file</code> (<code>--pua-*</code>)</li>
+        <li>Browser extension: <code>checkDomain()</code>, <code>normalizeDomain()</code></li>
+        <li>Browser extension: <code>THREAT_CATEGORIES</code> map, <code>categoryLabel()</code>, <code>categoryIcon()</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>v1.0 — Initial Release</h3>
+  <p style="color: var(--muted);">Original 12 categories (MALWARE, PHISHING, C2, CRYPTOMINER, RANSOMWARE, EXPLOIT,
+  SCANNER, SPAM, BOTNET, INFOSTEALER, DROPPER, BACKDOOR) with FILE, URL, and IPV4
+  artifact types.</p>
+</section>
+
+</main>
+
+<script>
+// Highlight active sidebar link on scroll
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.sidebar nav a');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(a => a.classList.remove('active'));
+      const active = document.querySelector(`.sidebar nav a[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
