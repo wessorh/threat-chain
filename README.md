@@ -117,6 +117,9 @@ Manages threat attestations on-chain.
 | `MsgEndorseAttestation` | Endorse an existing attestation to boost trust score |
 | `MsgDisputeAttestation` | File a dispute against an attestation |
 | `MsgRevokeAttestation`  | Revoke your own published attestation |
+| `MsgClaimReward`        | Claim a share of the attestation incentive pool |
+| `MsgSubscribe`          | Lock TATST to activate a paid API tier (PRO/ENTERPRISE) |
+| `MsgUnsubscribe`        | Return locked tokens and revert to the FREE tier |
 
 **Key fields:** `artifact_type`, `artifact_sha256`, `severity`, `confidence`, `ttl_seconds`, `attester_domain`, `attester_selector`
 

@@ -51,6 +51,18 @@ The chain publishes, endorses, disputes, and revokes cryptographically verifiabl
 severity_weight × (confidence/100) × (1 + log₂(1 + endorsements)) × tier_weight
 ```
 
+**FR-ATT-12** — Attesters shall claim a share of the attestation incentive pool via `MsgClaimReward`. Each claim withdraws 1% of the pool balance, is rate-limited to one claim per attester per epoch, and requires a non-empty pool.
+
+**FR-ATT-13** — The system shall support paid API subscription tiers via `MsgSubscribe`/`MsgUnsubscribe`:
+
+| Tier | Stake | Lock | Rate limit | Features |
+|------|-------|------|------------|----------|
+| FREE | 0 | — | 10 req/min | SHA-256 lookup |
+| PROFESSIONAL | 1,000 TATST | 90 days | 1,000 req/min | all |
+| ENTERPRISE | 100,000 TATST | 365 days | 10,000 req/min | all |
+
+Re-subscribing refunds the prior stake before locking the new one; `MsgUnsubscribe` returns the full stake.
+
 ### 2.2 Chain — Identity Module (`x/identity`)
 
 **FR-ID-01** — The system shall bind Cosmos addresses to DNSSEC-secured domain names via DNS TXT records.
