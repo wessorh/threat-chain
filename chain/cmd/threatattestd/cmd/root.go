@@ -155,20 +155,22 @@ func addModuleInitFlags(startCmd *cobra.Command) {
 
 // AttestationSpec is the JSON structure written to the output file.
 type AttestationSpec struct {
-	SchemaVersion  string   `json:"schema_version"`
-	ArtifactType   string   `json:"artifact_type"`
-	ArtifactSHA256 string   `json:"artifact_sha256"`
-	RawValue       string   `json:"raw_value,omitempty"`
-	Severity       string   `json:"severity"`
-	Confidence     int      `json:"confidence"`
-	TTLSeconds     int64    `json:"ttl_seconds"`
-	Description    string   `json:"description"`
-	Tags           []string `json:"tags,omitempty"`
-	ThreatCategory []string `json:"threat_category,omitempty"`
-	Attester       string   `json:"attester,omitempty"`
-	PublishedAt    int64    `json:"published_at"`
-	ExpiresAt      int64    `json:"expires_at"`
-	ChainID        string   `json:"chain_id,omitempty"`
+	SchemaVersion     string   `json:"schema_version"`
+	ArtifactType      string   `json:"artifact_type"`
+	ArtifactSHA256    string   `json:"artifact_sha256"`
+	HollomanSignature string   `json:"holloman_signature,omitempty"`
+	HammingMask       int32    `json:"hamming_mask,omitempty"`
+	RawValue          string   `json:"raw_value,omitempty"`
+	Severity          string   `json:"severity"`
+	Confidence        int      `json:"confidence"`
+	TTLSeconds        int64    `json:"ttl_seconds"`
+	Description       string   `json:"description"`
+	Tags              []string `json:"tags,omitempty"`
+	ThreatCategory    []string `json:"threat_category,omitempty"`
+	Attester          string   `json:"attester,omitempty"`
+	PublishedAt       int64    `json:"published_at"`
+	ExpiresAt         int64    `json:"expires_at"`
+	ChainID           string   `json:"chain_id,omitempty"`
 	// Computed fields displayed to the user
 	FileSizeBytes int64  `json:"file_size_bytes,omitempty"`
 	FileName      string `json:"file_name,omitempty"`
@@ -238,6 +240,12 @@ Examples:
 		"Chain ID to embed in the spec")
 	cmd.Flags().Bool("dry-run", false,
 		"Validate and print the spec without writing to disk")
+	cmd.Flags().String("artifact-type", "FILE",
+		"Artifact type: FILE or EMAIL_BODY")
+	cmd.Flags().String("holloman-signature", "",
+		"128-bit holloman perceptual fingerprint (32 lowercase hex chars) for near-duplicate matching")
+	cmd.Flags().Int32("hamming-mask", 0,
+		"Holloman hamming-mask radius (0-128); the attestation matches fingerprints within this Hamming distance")
 
 	return cmd
 }
@@ -262,6 +270,11 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error reading file %q: %w", filePath, err)
 	}
 	artifactSHA256 := hex.EncodeToString(h.Sum(nil))
+
+	// Holloman / artifact-type flags (parsed here, validated below).
+	artifactType, _ := cmd.Flags().GetString("artifact-type")
+	hollomanSig, _ := cmd.Flags().GetString("holloman-signature")
+	hammingMask, _ := cmd.Flags().GetInt32("hamming-mask")
 
 	// ── Read flags ────────────────────────────────────────────────────────────
 	severity, _ := cmd.Flags().GetString("severity")
@@ -305,6 +318,27 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 	if len(categories) > 8 {
 		return fmt.Errorf("too many --category entries: maximum is 8, got %d", len(categories))
 	}
+	if artifactType != "FILE" && artifactType != "EMAIL_BODY" {
+		return fmt.Errorf("invalid --artifact-type %q: must be FILE or EMAIL_BODY", artifactType)
+	}
+	if hammingMask < 0 || hammingMask > 128 {
+		return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
+	}
+	if hollomanSig != "" {
+		valid := len(hollomanSig) == 32
+		for _, c := range hollomanSig {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars")
+		}
+	}
+	if artifactType == "EMAIL_BODY" && hollomanSig == "" {
+		return fmt.Errorf("--holloman-signature is required for EMAIL_BODY artifacts")
+	}
 	if attester == "" {
 		attester = "<set --attester tatst1... or use 'tx attestation publish --from key'>"
 	}
@@ -312,21 +346,23 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 	// ── Build spec ────────────────────────────────────────────────────────────
 	now := time.Now().Unix()
 	spec := AttestationSpec{
-		SchemaVersion:  "1.0",
-		ArtifactType:   "FILE",
-		ArtifactSHA256: artifactSHA256,
-		Severity:       severity,
-		Confidence:     confidence,
-		TTLSeconds:     ttl,
-		Description:    description,
-		Tags:           tags,
-		ThreatCategory: categories,
-		Attester:       attester,
-		PublishedAt:    now,
-		ExpiresAt:      now + ttl,
-		ChainID:        chainID,
-		FileSizeBytes:  fi.Size(),
-		FileName:       fi.Name(),
+		SchemaVersion:     "1.0",
+		ArtifactType:      artifactType,
+		ArtifactSHA256:    artifactSHA256,
+		HollomanSignature: hollomanSig,
+		HammingMask:       hammingMask,
+		Severity:          severity,
+		Confidence:        confidence,
+		TTLSeconds:        ttl,
+		Description:       description,
+		Tags:              tags,
+		ThreatCategory:    categories,
+		Attester:          attester,
+		PublishedAt:       now,
+		ExpiresAt:         now + ttl,
+		ChainID:           chainID,
+		FileSizeBytes:     fi.Size(),
+		FileName:          fi.Name(),
 	}
 
 	specJSON, err := json.MarshalIndent(spec, "", "  ")
@@ -459,6 +495,10 @@ Examples:
 	cmd.Flags().String("output", "url-attestation.json", "Path to write the attestation JSON spec")
 	cmd.Flags().String("chain-id", "threatattest-1", "Chain ID to embed in the spec")
 	cmd.Flags().Bool("dry-run", false, "Validate and print the spec without writing to disk")
+	cmd.Flags().String("holloman-signature", "",
+		"128-bit holloman perceptual fingerprint (32 lowercase hex chars) for near-duplicate matching")
+	cmd.Flags().Int32("hamming-mask", 0,
+		"Holloman hamming-mask radius (0-128)")
 	return cmd
 }
 
@@ -472,6 +512,25 @@ func runAttestURL(cmd *cobra.Command, args []string) error {
 	}
 	h := sha256.Sum256([]byte(normURL))
 	artifactSHA256 := hex.EncodeToString(h[:])
+
+	// Holloman flags
+	hollomanSig, _ := cmd.Flags().GetString("holloman-signature")
+	hammingMask, _ := cmd.Flags().GetInt32("hamming-mask")
+	if hammingMask < 0 || hammingMask > 128 {
+		return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
+	}
+	if hollomanSig != "" {
+		valid := len(hollomanSig) == 32
+		for _, c := range hollomanSig {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars")
+		}
+	}
 
 	// Read flags
 	severity, _ := cmd.Flags().GetString("severity")
@@ -503,20 +562,22 @@ func runAttestURL(cmd *cobra.Command, args []string) error {
 
 	now := time.Now().Unix()
 	spec := AttestationSpec{
-		SchemaVersion:  "1.0",
-		ArtifactType:   "URL",
-		ArtifactSHA256: artifactSHA256,
-		RawValue:       normURL,
-		Severity:       severity,
-		Confidence:     confidence,
-		TTLSeconds:     ttl,
-		Description:    description,
-		Tags:           tags,
-		ThreatCategory: categories,
-		Attester:       attester,
-		PublishedAt:    now,
-		ExpiresAt:      now + ttl,
-		ChainID:        chainID,
+		SchemaVersion:     "1.0",
+		ArtifactType:      "URL",
+		ArtifactSHA256:    artifactSHA256,
+		HollomanSignature: hollomanSig,
+		HammingMask:       hammingMask,
+		RawValue:          normURL,
+		Severity:          severity,
+		Confidence:        confidence,
+		TTLSeconds:        ttl,
+		Description:       description,
+		Tags:              tags,
+		ThreatCategory:    categories,
+		Attester:          attester,
+		PublishedAt:       now,
+		ExpiresAt:         now + ttl,
+		ChainID:           chainID,
 	}
 
 	specJSON, err := json.MarshalIndent(spec, "", "  ")

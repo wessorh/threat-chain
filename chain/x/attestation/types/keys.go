@@ -20,6 +20,7 @@ const (
 	EpochNumberKey       = 0x09
 	SubscriptionPrefix   = 0x0A
 	ClaimEpochPrefix     = 0x0B
+	HollomanIndexPrefix  = 0x0C
 )
 
 // Key builders
@@ -70,6 +71,10 @@ func EndorserSetKey(attestationID, endorser string) []byte {
 
 func ClaimEpochKey(attester string) []byte {
 	return append([]byte{ClaimEpochPrefix}, []byte(attester)...)
+}
+
+func HollomanIndexKey(signature string) []byte {
+	return append([]byte{HollomanIndexPrefix}, []byte(signature)...)
 }
 
 func encodeInt64BigEndian(v int64) []byte {

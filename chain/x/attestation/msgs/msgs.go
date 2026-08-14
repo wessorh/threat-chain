@@ -23,7 +23,16 @@ type MsgPublishAttestation struct {
 	// For URL: SHA-256 of the normalized UTF-8 URL bytes.
 	// For IPv4: SHA-256 of the 4-byte big-endian packed address.
 	// For FILE: SHA-256 of the raw file bytes.
+	// For EMAIL_BODY: SHA-256 of the normalized body bytes.
 	ArtifactSHA256 string `json:"artifact_sha256"`
+	// HollomanSignature is the 128-bit holloman perceptual fingerprint (32 hex
+	// chars) for near-duplicate matching. Optional for FILE/URL; required for
+	// EMAIL_BODY.
+	HollomanSignature string `json:"holloman_signature,omitempty"`
+	// HammingMask is the holloman hamming-mask suffix (0-128). The attestation
+	// matches any artifact whose fingerprint is within this Hamming distance of
+	// HollomanSignature. 0 = exact match.
+	HammingMask int32 `json:"hamming_mask,omitempty"`
 	// RawValue is the human-readable value (URL string, IPv4 string, or empty for files).
 	RawValue         string                   `json:"raw_value,omitempty"`
 	Severity         types.SeverityLevel      `json:"severity"`
@@ -64,6 +73,12 @@ func (m *MsgPublishAttestation) ValidateBasic() error {
 	}
 	if !types.IsValidSHA256Hex(m.ArtifactSHA256) {
 		return types.ErrInvalidSHA256
+	}
+	if !types.IsValidHammingMask(m.HammingMask) {
+		return types.ErrInvalidHammingMask
+	}
+	if m.HollomanSignature != "" && !types.IsValidHollomanSignature(m.HollomanSignature) {
+		return types.ErrInvalidHollomanSignature
 	}
 	if m.ArtifactSHA256 == types.EmptySHA256 {
 		return types.ErrInvalidSHA256
@@ -127,6 +142,11 @@ func (m *MsgPublishAttestation) ValidateBasic() error {
 		}
 	case types.ArtifactType_FILE:
 		// raw_value is optional (filename hint); SHA-256 is authoritative
+	case types.ArtifactType_EMAIL_BODY:
+		// Identified by holloman perceptual fingerprint; SHA-256 is canonical.
+		if m.HollomanSignature == "" {
+			return types.ErrHollomanSignatureRequired
+		}
 	case types.ArtifactType_DOMAIN:
 		if m.RawValue == "" {
 			return types.ErrMissingRawValue

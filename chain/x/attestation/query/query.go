@@ -24,10 +24,10 @@ type QueryIsMaliciousRequest struct {
 }
 
 type QueryIsMaliciousResponse struct {
-	IsMalicious   bool                       `json:"is_malicious"`
-	Attestation   *types.AttestationRecord   `json:"attestation,omitempty"`
+	IsMalicious bool                     `json:"is_malicious"`
+	Attestation *types.AttestationRecord `json:"attestation,omitempty"`
 	// TrustScore combines severity, confidence, endorsement count, and RS.
-	TrustScore    uint32                     `json:"trust_score"`
+	TrustScore uint32 `json:"trust_score"`
 }
 
 // QueryGetAttestationRequest fetches a single attestation by ID.
@@ -96,6 +96,17 @@ type QueryIsMaliciousIPv4Request struct {
 	IPv4 string `json:"ipv4"`
 }
 
+// QueryIsMaliciousHollomanRequest looks up by holloman perceptual signature
+// with an optional query-side hamming mask (tolerance radius).
+type QueryIsMaliciousHollomanRequest struct {
+	// HollomanSignature is the 128-bit holloman fingerprint (32 lowercase hex).
+	HollomanSignature string `json:"holloman_signature"`
+	// HammingMask is the query-side tolerance (0-128). A stored attestation
+	// matches when its fingerprint is within (this mask + its own stored mask)
+	// Hamming distance of HollomanSignature.
+	HammingMask int32 `json:"hamming_mask,omitempty"`
+}
+
 // ============================================================
 // QueryServer
 // ============================================================
@@ -153,6 +164,36 @@ func (q *QueryServer) IsMaliciousIPv4(goCtx context.Context, req *QueryIsMalicio
 	}
 	sha256 := types.ArtifactSHA256ForIPv4(req.IPv4)
 	return q.IsMalicious(goCtx, &QueryIsMaliciousRequest{ArtifactSHA256: sha256})
+}
+
+// IsMaliciousHolloman checks whether an artifact is attested malicious by its
+// holloman perceptual signature, using hamming-mask matching.
+func (q *QueryServer) IsMaliciousHolloman(goCtx context.Context, req *QueryIsMaliciousHollomanRequest) (*QueryIsMaliciousResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	if !types.IsValidHollomanSignature(req.HollomanSignature) {
+		return nil, errors.Wrap(types.ErrInvalidHollomanSignature, req.HollomanSignature)
+	}
+	if !types.IsValidHammingMask(req.HammingMask) {
+		return nil, errors.Wrap(types.ErrInvalidHammingMask, "query hamming mask out of range")
+	}
+
+	malicious, rec, err := q.keeper.IsMaliciousByHolloman(ctx, req.HollomanSignature, req.HammingMask)
+	if err != nil {
+		return nil, err
+	}
+
+	var trustScore uint32
+	if rec != nil {
+		attesterRS, _ := q.fetchAttesterRS(ctx, rec.Attester)
+		trustScore = types.TrustScore(rec.Severity, rec.Confidence, rec.EndorsementCount, attesterRS)
+	}
+
+	return &QueryIsMaliciousResponse{
+		IsMalicious: malicious,
+		Attestation: rec,
+		TrustScore:  trustScore,
+	}, nil
 }
 
 // GetAttestation fetches a single attestation record by ID.

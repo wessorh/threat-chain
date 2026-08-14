@@ -237,6 +237,66 @@ func (k Keeper) RemoveArtifactIndexEntry(ctx sdk.Context, artifactSHA256, attest
 }
 
 // ============================================================
+// Holloman Index  (holloman_signature → []attestation_id)
+// ============================================================
+
+// SetHollomanIndex stores the list of attestation IDs for a holloman signature.
+func (k Keeper) SetHollomanIndex(ctx sdk.Context, signature string, ids []string) error {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := json.Marshal(ids)
+	if err != nil {
+		return fmt.Errorf("marshal holloman index: %w", err)
+	}
+	return kvStore.Set(types.HollomanIndexKey(signature), bz)
+}
+
+// GetHollomanIndex returns the attestation IDs for an exact holloman signature.
+func (k Keeper) GetHollomanIndex(ctx sdk.Context, signature string) ([]string, error) {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := kvStore.Get(types.HollomanIndexKey(signature))
+	if err != nil {
+		return nil, err
+	}
+	if bz == nil {
+		return nil, nil
+	}
+	var ids []string
+	if err := json.Unmarshal(bz, &ids); err != nil {
+		return nil, fmt.Errorf("unmarshal holloman index: %w", err)
+	}
+	return ids, nil
+}
+
+// AddHollomanIndexEntry appends an attestation ID to the holloman index.
+func (k Keeper) AddHollomanIndexEntry(ctx sdk.Context, signature, attestationID string) error {
+	ids, err := k.GetHollomanIndex(ctx, signature)
+	if err != nil {
+		return err
+	}
+	ids = append(ids, attestationID)
+	return k.SetHollomanIndex(ctx, signature, ids)
+}
+
+// RemoveHollomanIndexEntry removes a specific attestation ID from the holloman index.
+func (k Keeper) RemoveHollomanIndexEntry(ctx sdk.Context, signature, attestationID string) error {
+	ids, err := k.GetHollomanIndex(ctx, signature)
+	if err != nil {
+		return err
+	}
+	filtered := ids[:0]
+	for _, id := range ids {
+		if id != attestationID {
+			filtered = append(filtered, id)
+		}
+	}
+	if len(filtered) == 0 {
+		kvStore := k.storeService.OpenKVStore(ctx)
+		return kvStore.Delete(types.HollomanIndexKey(signature))
+	}
+	return k.SetHollomanIndex(ctx, signature, filtered)
+}
+
+// ============================================================
 // Attester Index  (attester_address → []attestation_id)
 // ============================================================
 
@@ -600,6 +660,11 @@ func (k Keeper) PublishAttestationRecord(ctx sdk.Context, rec types.AttestationR
 	if err := k.AddArtifactIndexEntry(ctx, rec.ArtifactSHA256, rec.ID); err != nil {
 		return err
 	}
+	if rec.HollomanSignature != "" {
+		if err := k.AddHollomanIndexEntry(ctx, rec.HollomanSignature, rec.ID); err != nil {
+			return err
+		}
+	}
 	if err := k.AddAttesterIndexEntry(ctx, rec.Attester, rec.ID); err != nil {
 		return err
 	}
@@ -655,6 +720,13 @@ func (k Keeper) ExpireAttestation(ctx sdk.Context, id string) error {
 		return err
 	}
 
+	// Remove from holloman index
+	if rec.HollomanSignature != "" {
+		if err := k.RemoveHollomanIndexEntry(ctx, rec.HollomanSignature, id); err != nil {
+			return err
+		}
+	}
+
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeExpireAttestation,
 		sdk.NewAttribute(types.AttributeKeyAttestationID, id),
@@ -682,6 +754,11 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 	}
 	if err := k.RemoveArtifactIndexEntry(ctx, rec.ArtifactSHA256, id); err != nil {
 		return err
+	}
+	if rec.HollomanSignature != "" {
+		if err := k.RemoveHollomanIndexEntry(ctx, rec.HollomanSignature, id); err != nil {
+			return err
+		}
 	}
 	if err := k.DequeueExpiry(ctx, rec.ExpiresAt, id); err != nil {
 		return err
@@ -766,6 +843,50 @@ func (k Keeper) bestActiveRecord(ctx sdk.Context, ids []string) (bool, *types.At
 		if best == nil || types.SeverityValue(rec.Severity) > types.SeverityValue(best.Severity) {
 			r := rec
 			best = &r
+		}
+	}
+	if best == nil {
+		return false, nil, nil
+	}
+	return true, best, nil
+}
+
+// IsMaliciousByHolloman returns the highest-severity active attestation whose
+// holloman signature is within (queryMask + stored mask) Hamming distance of
+// the query signature. Iterates the holloman index (O(n) in indexed artifacts).
+func (k Keeper) IsMaliciousByHolloman(ctx sdk.Context, signature string, queryMask int32) (bool, *types.AttestationRecord, error) {
+	if !types.IsValidHollomanSignature(signature) {
+		return false, nil, types.ErrInvalidHollomanSignature
+	}
+	kvStore := k.storeService.OpenKVStore(ctx)
+	iter, err := kvStore.Iterator([]byte{types.HollomanIndexPrefix}, prefixEndBytes([]byte{types.HollomanIndexPrefix}))
+	if err != nil {
+		return false, nil, err
+	}
+	defer iter.Close()
+
+	var best *types.AttestationRecord
+	for ; iter.Valid(); iter.Next() {
+		var ids []string
+		if err := json.Unmarshal(iter.Value(), &ids); err != nil {
+			continue
+		}
+		for _, id := range ids {
+			rec, err := k.GetAttestation(ctx, id)
+			if err != nil || rec.Status != types.AttestationStatus_ACTIVE || rec.HollomanSignature == "" {
+				continue
+			}
+			dist, err := types.HollomanHammingDistance(rec.HollomanSignature, signature)
+			if err != nil {
+				continue
+			}
+			if int32(dist) > queryMask+rec.HammingMask {
+				continue
+			}
+			if best == nil || types.SeverityValue(rec.Severity) > types.SeverityValue(best.Severity) {
+				r := rec
+				best = &r
+			}
 		}
 	}
 	if best == nil {

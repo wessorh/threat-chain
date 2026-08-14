@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/bits"
 	"net"
 	"net/url"
 	"regexp"
@@ -33,9 +34,9 @@ const (
 	MaxRelatedTo        = 32
 
 	// TTL limits
-	MinTTLSeconds     int64 = 3600           // 1 hour
-	MaxTTLSeconds     int64 = 31_536_000     // 365 days
-	MaxTTLIPv4Seconds int64 = 7_776_000      // 90 days
+	MinTTLSeconds     int64 = 3600       // 1 hour
+	MaxTTLSeconds     int64 = 31_536_000 // 365 days
+	MaxTTLIPv4Seconds int64 = 7_776_000  // 90 days
 
 	// Blocks per epoch (~1 hour at 2 s block time)
 	BlocksPerEpoch = int64(1800)
@@ -172,6 +173,10 @@ const (
 	// host rather than a specific URL endpoint.
 	// The artifact SHA-256 is computed as SHA-256(NormalizeDomain(domain)).
 	ArtifactType_DOMAIN ArtifactType = 4
+	// ArtifactType_EMAIL_BODY represents an email message body attested by its
+	// holloman perceptual fingerprint (near-duplicate template matching). The
+	// artifact SHA-256 is the SHA-256 of the normalized body bytes.
+	ArtifactType_EMAIL_BODY ArtifactType = 5
 )
 
 func (a ArtifactType) String() string {
@@ -184,6 +189,8 @@ func (a ArtifactType) String() string {
 		return "IPV4"
 	case ArtifactType_DOMAIN:
 		return "DOMAIN"
+	case ArtifactType_EMAIL_BODY:
+		return "EMAIL_BODY"
 	default:
 		return "UNSPECIFIED"
 	}
@@ -305,12 +312,12 @@ const (
 type RuleAppliesTo int32
 
 const (
-	RuleAppliesTo_UNSPECIFIED  RuleAppliesTo = 0
-	RuleAppliesTo_FILE_BYTES   RuleAppliesTo = 1
-	RuleAppliesTo_URL_PATH     RuleAppliesTo = 2
-	RuleAppliesTo_URL_FULL     RuleAppliesTo = 3
-	RuleAppliesTo_IP_TRAFFIC   RuleAppliesTo = 4
-	RuleAppliesTo_ANY          RuleAppliesTo = 5
+	RuleAppliesTo_UNSPECIFIED RuleAppliesTo = 0
+	RuleAppliesTo_FILE_BYTES  RuleAppliesTo = 1
+	RuleAppliesTo_URL_PATH    RuleAppliesTo = 2
+	RuleAppliesTo_URL_FULL    RuleAppliesTo = 3
+	RuleAppliesTo_IP_TRAFFIC  RuleAppliesTo = 4
+	RuleAppliesTo_ANY         RuleAppliesTo = 5
 )
 
 // ============================================================
@@ -320,12 +327,12 @@ const (
 type DisputeGround int32
 
 const (
-	DisputeGround_UNSPECIFIED        DisputeGround = 0
-	DisputeGround_FALSE_POSITIVE     DisputeGround = 1
-	DisputeGround_INCORRECT_SEVERITY DisputeGround = 2
+	DisputeGround_UNSPECIFIED         DisputeGround = 0
+	DisputeGround_FALSE_POSITIVE      DisputeGround = 1
+	DisputeGround_INCORRECT_SEVERITY  DisputeGround = 2
 	DisputeGround_FABRICATED_EVIDENCE DisputeGround = 3
-	DisputeGround_STALE_REUSE        DisputeGround = 4
-	DisputeGround_SYBIL_ATTACK       DisputeGround = 5
+	DisputeGround_STALE_REUSE         DisputeGround = 4
+	DisputeGround_SYBIL_ATTACK        DisputeGround = 5
 )
 
 func (d DisputeGround) String() string {
@@ -442,43 +449,51 @@ type PUAMetadata struct {
 // AttestationRecord is the canonical on-chain threat intelligence record.
 type AttestationRecord struct {
 	// ID is the deterministic attestation identifier (SHA-256 derived).
-	ID              string            `json:"id"`
-	SchemaVersion   uint32            `json:"schema_version"`
-	ArtifactType    ArtifactType      `json:"artifact_type"`
+	ID            string       `json:"id"`
+	SchemaVersion uint32       `json:"schema_version"`
+	ArtifactType  ArtifactType `json:"artifact_type"`
 	// ArtifactSHA256 is the hex-encoded SHA-256 of the artifact.
-	ArtifactSHA256  string            `json:"artifact_sha256"`
+	ArtifactSHA256 string `json:"artifact_sha256"`
+	// HollomanSignature is the 128-bit holloman perceptual fingerprint (32 hex
+	// chars) used for near-duplicate matching. Optional for FILE/URL; required
+	// for EMAIL_BODY.
+	HollomanSignature string `json:"holloman_signature,omitempty"`
+	// HammingMask is the holloman hamming-mask suffix (0-128): the attestation
+	// matches any artifact whose fingerprint is within this Hamming distance of
+	// HollomanSignature. 0 = exact match.
+	HammingMask int32 `json:"hamming_mask,omitempty"`
 	// RawValue holds the human-readable URL or IPv4 string (empty for files).
-	RawValue        string            `json:"raw_value,omitempty"`
-	Severity        SeverityLevel     `json:"severity"`
-	TLP             TLPLevel          `json:"tlp"`
-	Attester        string            `json:"attester"`
-	PublishedAt     int64             `json:"published_at"`
-	TTLSeconds      int64             `json:"ttl_seconds"`
-	ExpiresAt       int64             `json:"expires_at"`
-	Confidence      uint32            `json:"confidence"`
-	Description     string            `json:"description,omitempty"`
-	Tags            []string          `json:"tags,omitempty"`
-	ThreatCategories []string         `json:"threat_categories,omitempty"`
-	DetectionRules  []DetectionRuleRef `json:"detection_rules,omitempty"`
-	RelatedTo       []string          `json:"related_to,omitempty"`
-	MitreAttackIDs  []string          `json:"mitre_attack_ids,omitempty"`
+	RawValue         string             `json:"raw_value,omitempty"`
+	Severity         SeverityLevel      `json:"severity"`
+	TLP              TLPLevel           `json:"tlp"`
+	Attester         string             `json:"attester"`
+	PublishedAt      int64              `json:"published_at"`
+	TTLSeconds       int64              `json:"ttl_seconds"`
+	ExpiresAt        int64              `json:"expires_at"`
+	Confidence       uint32             `json:"confidence"`
+	Description      string             `json:"description,omitempty"`
+	Tags             []string           `json:"tags,omitempty"`
+	ThreatCategories []string           `json:"threat_categories,omitempty"`
+	DetectionRules   []DetectionRuleRef `json:"detection_rules,omitempty"`
+	RelatedTo        []string           `json:"related_to,omitempty"`
+	MitreAttackIDs   []string           `json:"mitre_attack_ids,omitempty"`
 	// AttesterSig is the base64-encoded secp256k1 signature over the attestation payload.
-	AttesterSig     string            `json:"attester_sig"`
-	Status          AttestationStatus `json:"status"`
-	EndorsementCount uint32           `json:"endorsement_count"`
-	DisputeCount    uint32            `json:"dispute_count"`
-	RevokeReason    string            `json:"revoke_reason,omitempty"`
-	BlockHeight     int64             `json:"block_height"`
-	TxHash          string            `json:"tx_hash,omitempty"`
+	AttesterSig      string            `json:"attester_sig"`
+	Status           AttestationStatus `json:"status"`
+	EndorsementCount uint32            `json:"endorsement_count"`
+	DisputeCount     uint32            `json:"dispute_count"`
+	RevokeReason     string            `json:"revoke_reason,omitempty"`
+	BlockHeight      int64             `json:"block_height"`
+	TxHash           string            `json:"tx_hash,omitempty"`
 	// PUAInfo is populated when ArtifactType==FILE and category includes TATST:PUA.
-	PUAInfo         *PUAMetadata      `json:"pua_info,omitempty"`
+	PUAInfo *PUAMetadata `json:"pua_info,omitempty"`
 	// AttesterDomain is the normalized domain name of the attester's DNS identity (optional).
 	// Populated when the attester has a registered DNS identity and wishes to cross-reference it.
-	AttesterDomain   string           `json:"attester_domain,omitempty"`
+	AttesterDomain string `json:"attester_domain,omitempty"`
 	// AttesterSelector is the DNS selector used for the attester's active TAT key record.
-	AttesterSelector string           `json:"attester_selector,omitempty"`
+	AttesterSelector string `json:"attester_selector,omitempty"`
 	// AttesterTier is the compliance tier of the attester at publish time (0=ANON,1=STAKED,2=DNS,3=EXPERT).
-	AttesterTier     int32            `json:"attester_tier,omitempty"`
+	AttesterTier int32 `json:"attester_tier,omitempty"`
 }
 
 // ============================================================
@@ -506,16 +521,16 @@ type DisputeRecord struct {
 // Params holds x/attestation module parameters.
 type Params struct {
 	// MinAttesterDelegation is the minimum staked utatst required to publish.
-	MinAttesterDelegation      string `json:"min_attester_delegation"`
-	MinTTLSeconds              int64  `json:"min_ttl_seconds"`
-	MaxTTLSeconds              int64  `json:"max_ttl_seconds"`
-	MaxTTLIPv4Seconds          int64  `json:"max_ttl_ipv4_seconds"`
-	MaxDetectionRules          uint32 `json:"max_detection_rules"`
-	MaxAttestationsPerEpoch    uint32 `json:"max_attestations_per_epoch"`
+	MinAttesterDelegation   string `json:"min_attester_delegation"`
+	MinTTLSeconds           int64  `json:"min_ttl_seconds"`
+	MaxTTLSeconds           int64  `json:"max_ttl_seconds"`
+	MaxTTLIPv4Seconds       int64  `json:"max_ttl_ipv4_seconds"`
+	MaxDetectionRules       uint32 `json:"max_detection_rules"`
+	MaxAttestationsPerEpoch uint32 `json:"max_attestations_per_epoch"`
 	// DisputeBondAmount is the bond (in utatst) required to open a dispute.
-	DisputeBondAmount          string `json:"dispute_bond_amount"`
-	IPv4MinConfidence          uint32 `json:"ipv4_min_confidence"`
-	TimestampToleranceSeconds  int64  `json:"timestamp_tolerance_seconds"`
+	DisputeBondAmount         string `json:"dispute_bond_amount"`
+	IPv4MinConfidence         uint32 `json:"ipv4_min_confidence"`
+	TimestampToleranceSeconds int64  `json:"timestamp_tolerance_seconds"`
 	// Minimum reputation scores for various actions
 	MinReputationToAttest  uint32 `json:"min_reputation_to_attest"`
 	MinReputationToEndorse uint32 `json:"min_reputation_to_endorse"`
@@ -525,13 +540,13 @@ type Params struct {
 // DefaultParams returns sensible default module parameters.
 func DefaultParams() Params {
 	return Params{
-		MinAttesterDelegation:     "1000000000",  // 1000 TATST in utatst
+		MinAttesterDelegation:     "1000000000", // 1000 TATST in utatst
 		MinTTLSeconds:             MinTTLSeconds,
 		MaxTTLSeconds:             MaxTTLSeconds,
 		MaxTTLIPv4Seconds:         MaxTTLIPv4Seconds,
 		MaxDetectionRules:         32,
 		MaxAttestationsPerEpoch:   100,
-		DisputeBondAmount:         "500000000",   // 500 TATST in utatst
+		DisputeBondAmount:         "500000000", // 500 TATST in utatst
 		IPv4MinConfidence:         30,
 		TimestampToleranceSeconds: 300,
 		MinReputationToAttest:     0,
@@ -595,6 +610,46 @@ func IsValidSHA256Hex(s string) bool {
 		}
 	}
 	return true
+}
+
+// IsValidHollomanSignature returns true if s is a valid lowercase 32-char hex
+// string (a 128-bit holloman perceptual fingerprint).
+func IsValidHollomanSignature(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsValidHammingMask returns true if d is a valid holloman hamming-mask radius.
+func IsValidHammingMask(d int32) bool {
+	return d >= 0 && d <= 128
+}
+
+// HollomanHammingDistance returns the bitwise Hamming distance between two
+// 128-bit holloman signatures (32-char lowercase hex strings).
+func HollomanHammingDistance(a, b string) (int, error) {
+	if !IsValidHollomanSignature(a) || !IsValidHollomanSignature(b) {
+		return 0, fmt.Errorf("invalid holloman signature")
+	}
+	ab, err := hex.DecodeString(a)
+	if err != nil {
+		return 0, err
+	}
+	bb, err := hex.DecodeString(b)
+	if err != nil {
+		return 0, err
+	}
+	d := 0
+	for i := range ab {
+		d += bits.OnesCount8(ab[i] ^ bb[i])
+	}
+	return d, nil
 }
 
 // IsValidCIDv1 returns true for CIDv1 base32-lower strings.
@@ -704,7 +759,6 @@ func ArtifactSHA256ForIPv4(ipStr string) string {
 	h := sha256.Sum256([]byte(ipStr))
 	return hex.EncodeToString(h[:])
 }
-
 
 // NormalizeDomain converts a domain name to its canonical lowercase form,
 // strips any leading "www." prefix, and validates basic structure.
