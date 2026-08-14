@@ -13,7 +13,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"google.golang.org/grpc"
 
 	identitycli "github.com/threatattest/chain/x/identity/cli"
 	"github.com/threatattest/chain/x/identity/keeper"
@@ -22,10 +21,10 @@ import (
 
 // Ensure AppModule implements all required interfaces.
 var (
-	_ module.AppModule          = AppModule{}
-	_ module.AppModuleBasic     = AppModuleBasic{}
-	_ appmodule.AppModule       = AppModule{}
-	_ appmodule.HasEndBlocker   = AppModule{}
+	_ module.AppModule        = AppModule{}
+	_ module.AppModuleBasic   = AppModuleBasic{}
+	_ appmodule.AppModule     = AppModule{}
+	_ appmodule.HasEndBlocker = AppModule{}
 )
 
 // ConsensusVersion defines the current x/identity module consensus version.
@@ -144,17 +143,5 @@ func (am AppModule) EndBlock(ctx context.Context) error {
 // RegisterInvariants is a no-op for now.
 func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}
 
-// Route is a no-op (legacy amino router not used).
-func (am AppModule) Route() sdk.Route { return sdk.Route{} }
-
-// QuerierRoute is a no-op.
-func (am AppModule) QuerierRoute() string { return "" }
-
-// LegacyQuerierHandler is a no-op.
-func (am AppModule) LegacyQuerierHandler(_ *codec.LegacyAmino) sdk.Querier { return nil }
-
-// ProtoMessage is a no-op.
+// RegisterGRPCGatewayRoutesV2 is a no-op (no grpc-gateway routes yet).
 func (am AppModule) RegisterGRPCGatewayRoutesV2(_ client.Context, _ *runtime.ServeMux) {}
-
-// RegisterGRPCServer is a no-op.
-func (am AppModule) RegisterGRPCServer(_ grpc.Server) {}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -36,7 +37,7 @@ type BankKeeper interface {
 
 // StakingKeeper defines the staking module methods used by x/identity.
 type StakingKeeper interface {
-	TotalBondedTokens(ctx sdk.Context) (sdk.Int, error)
+	TotalBondedTokens(ctx sdk.Context) (math.Int, error)
 }
 
 // NewKeeper constructs a new identity Keeper.

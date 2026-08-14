@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // htmlTagRe detects any HTML tag in free-text fields.
@@ -265,4 +267,112 @@ func abs64(v int64) int64 {
 		return -v
 	}
 	return v
+}
+
+// ============================================================
+// sdk.Msg interface implementations
+// ============================================================
+
+// Route implements sdk.Msg (legacy).
+func (m *MsgRegisterIdentity) Route() string { return ModuleName }
+
+// Type implements sdk.Msg (legacy).
+func (m *MsgRegisterIdentity) Type() string { return "register_identity" }
+
+// GetSigners returns the required signers.
+func (m *MsgRegisterIdentity) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.CosmosAddr)
+	return []sdk.AccAddress{addr}
+}
+
+// ProtoMessage implements proto.Message.
+func (*MsgRegisterIdentity) ProtoMessage() {}
+
+// Reset implements proto.Message.
+func (*MsgRegisterIdentity) Reset() {}
+
+// String implements proto.Message.
+func (m *MsgRegisterIdentity) String() string { return m.CosmosAddr }
+
+// XXX_MessageName returns the fully-qualified message name.
+func (*MsgRegisterIdentity) XXX_MessageName() string {
+	return "threatattest.identity.MsgRegisterIdentity"
+}
+
+// Route implements sdk.Msg (legacy).
+func (m *MsgRotateIdentityKey) Route() string { return ModuleName }
+
+// Type implements sdk.Msg (legacy).
+func (m *MsgRotateIdentityKey) Type() string { return "rotate_identity_key" }
+
+// GetSigners returns the required signers.
+func (m *MsgRotateIdentityKey) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.CosmosAddr)
+	return []sdk.AccAddress{addr}
+}
+
+// ProtoMessage implements proto.Message.
+func (*MsgRotateIdentityKey) ProtoMessage() {}
+
+// Reset implements proto.Message.
+func (*MsgRotateIdentityKey) Reset() {}
+
+// String implements proto.Message.
+func (m *MsgRotateIdentityKey) String() string { return m.CosmosAddr }
+
+// XXX_MessageName returns the fully-qualified message name.
+func (*MsgRotateIdentityKey) XXX_MessageName() string {
+	return "threatattest.identity.MsgRotateIdentityKey"
+}
+
+// Route implements sdk.Msg (legacy).
+func (m *MsgRevokeIdentity) Route() string { return ModuleName }
+
+// Type implements sdk.Msg (legacy).
+func (m *MsgRevokeIdentity) Type() string { return "revoke_identity" }
+
+// GetSigners returns the required signers.
+func (m *MsgRevokeIdentity) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.CosmosAddr)
+	return []sdk.AccAddress{addr}
+}
+
+// ProtoMessage implements proto.Message.
+func (*MsgRevokeIdentity) ProtoMessage() {}
+
+// Reset implements proto.Message.
+func (*MsgRevokeIdentity) Reset() {}
+
+// String implements proto.Message.
+func (m *MsgRevokeIdentity) String() string { return m.CosmosAddr }
+
+// XXX_MessageName returns the fully-qualified message name.
+func (*MsgRevokeIdentity) XXX_MessageName() string {
+	return "threatattest.identity.MsgRevokeIdentity"
+}
+
+// Route implements sdk.Msg (legacy).
+func (m *MsgRenewIdentity) Route() string { return ModuleName }
+
+// Type implements sdk.Msg (legacy).
+func (m *MsgRenewIdentity) Type() string { return "renew_identity" }
+
+// GetSigners returns the required signers.
+func (m *MsgRenewIdentity) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.CosmosAddr)
+	return []sdk.AccAddress{addr}
+}
+
+// ProtoMessage implements proto.Message.
+func (*MsgRenewIdentity) ProtoMessage() {}
+
+// Reset implements proto.Message.
+func (*MsgRenewIdentity) Reset() {}
+
+// String implements proto.Message.
+func (m *MsgRenewIdentity) String() string { return m.CosmosAddr }
+
+// XXX_MessageName returns the fully-qualified message name.
+func (*MsgRenewIdentity) XXX_MessageName() string {
+	return "threatattest.identity.MsgRenewIdentity"
 }
