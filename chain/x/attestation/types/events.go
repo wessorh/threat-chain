@@ -11,6 +11,7 @@ const (
 	EventTypeExpireAttestation  = "expire_attestation"
 	EventTypeSybilFlag          = "sybil_flag"
 	EventTypeUpdateParams       = "update_params"
+	EventTypeClaimReward        = "claim_reward"
 
 	AttributeKeyAttestationID  = "attestation_id"
 	AttributeKeyAttester       = "attester"

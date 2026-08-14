@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"cosmossdk.io/errors"
+	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	"github.com/threatattest/chain/x/attestation/msgs"
 	"github.com/threatattest/chain/x/attestation/types"
@@ -16,11 +18,18 @@ import (
 // MsgServer implements the attestation message handlers.
 type MsgServer struct {
 	Keeper
+	identityKeeper IdentityTierKeeper
 }
 
 // NewMsgServer returns a new MsgServer backed by the given Keeper.
 func NewMsgServer(k Keeper) *MsgServer {
 	return &MsgServer{Keeper: k}
+}
+
+// SetIdentityKeeper injects the identity keeper for tier-based confidence
+// scaling. Call during app wiring. If not called, defaults to Tier 0.
+func (s *MsgServer) SetIdentityKeeper(k IdentityTierKeeper) {
+	s.identityKeeper = k
 }
 
 // ============================================================
@@ -300,12 +309,12 @@ type IdentityTierKeeper interface {
 }
 
 // identityTier returns the compliance tier (0-3) for the given attester.
-// If no identity keeper is wired up (nil), defaults to Tier 0 (ANONYMOUS).
-func (s MsgServer) identityTier(ctx interface{ BlockHeight() int64 }, attester string) int32 {
-	// In production: inject IdentityTierKeeper into MsgServer and call it here.
-	// For now return ANONYMOUS (0) as a safe default so the module compiles.
-	// Wire-up example in app.go:
-	//   attestationMsgServer.SetIdentityKeeper(identityKeeper)
+// Delegates to the wired IdentityTierKeeper. If not wired, defaults to
+// Tier 0 (ANONYMOUS) so the module compiles and runs without identity.
+func (s *MsgServer) identityTier(ctx interface{ BlockHeight() int64 }, attester string) int32 {
+	if s.identityKeeper != nil {
+		return s.identityKeeper.GetTier(ctx, attester)
+	}
 	return 0
 }
 
@@ -333,4 +342,206 @@ func applyTierToConfidence(rawConfidence uint32, tier int32) uint32 {
 		scaled = 100
 	}
 	return scaled
+}
+
+// ============================================================
+// ClaimReward — attestation incentive pool distribution
+// ============================================================
+
+// ClaimReward allows an attester to claim their share of the attestation
+// module account's incentive pool. Each claim withdraws 1% of the pool
+// balance to prevent draining. A minimum of 1 utatst is always claimable.
+func (s *MsgServer) ClaimReward(goCtx context.Context, msg *msgs.MsgClaimReward) (*msgs.MsgClaimRewardResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	if err := msg.ValidateBasic(); err != nil {
+		return nil, err
+	}
+
+	attester, err := sdk.AccAddressFromBech32(msg.Attester)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rate-limit claims to one per attester per epoch.
+	epoch := types.CurrentEpoch(ctx.BlockHeight())
+	lastClaim, err := s.Keeper.GetClaimEpoch(ctx, msg.Attester)
+	if err != nil {
+		return nil, err
+	}
+	if lastClaim == epoch {
+		return nil, errors.Wrap(types.ErrRateLimitExceeded, "already claimed this epoch")
+	}
+
+	// Get attestation module account balance
+	modAddr := authtypes.NewModuleAddress(types.ModuleName)
+	poolBal := s.Keeper.bankKeeper.SpendableCoins(ctx, modAddr)
+
+	if poolBal.IsZero() {
+		return nil, errors.Wrap(types.ErrIncentivePoolEmpty, "incentive pool is empty")
+	}
+
+	// Calculate reward: 1% of pool per claim, clamped to the available balance.
+	denom := sdk.DefaultBondDenom
+	available := poolBal.AmountOf(denom)
+	reward := available.QuoRaw(100)
+	if reward.IsZero() {
+		reward = math.NewInt(1) // minimum 1 utatst
+	}
+	if reward.GT(available) {
+		reward = available
+	}
+	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, reward))
+
+	// Send reward from attestation module to attester
+	if err := s.Keeper.bankKeeper.SendCoinsFromModuleToAccount(
+		ctx,
+		types.ModuleName,
+		attester,
+		rewardCoins,
+	); err != nil {
+		return nil, errors.Wrapf(err, "failed to send reward to %s", msg.Attester)
+	}
+
+	if err := s.Keeper.SetClaimEpoch(ctx, msg.Attester, epoch); err != nil {
+		return nil, err
+	}
+
+	// Emit event
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		types.EventTypeClaimReward,
+		sdk.NewAttribute(types.AttributeKeyAttester, msg.Attester),
+		sdk.NewAttribute("reward_amount", rewardCoins.String()),
+	))
+
+	remaining := s.Keeper.bankKeeper.SpendableCoins(ctx, modAddr)
+	return &msgs.MsgClaimRewardResponse{
+		ClaimedAmount: rewardCoins.String(),
+		PoolRemaining: remaining.String(),
+	}, nil
+}
+
+// ============================================================
+// Subscribe — API tier subscription
+// ============================================================
+
+// Subscribe locks tokens from the subscriber and activates a paid API tier.
+func (s *MsgServer) Subscribe(goCtx context.Context, msg *msgs.MsgSubscribe) (*msgs.MsgSubscribeResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	if err := msg.ValidateBasic(); err != nil {
+		return nil, err
+	}
+
+	tier := types.SubscriptionTier(msg.Tier)
+	cfg, ok := types.TierConfigs[tier]
+	if !ok {
+		return nil, errors.Wrap(types.ErrInvalidTier, "unknown tier")
+	}
+	if tier == types.SubscriptionTier_FREE {
+		return nil, errors.Wrap(types.ErrInvalidTier, "use MsgUnsubscribe to return to free tier")
+	}
+
+	subscriber, err := sdk.AccAddressFromBech32(msg.Subscriber)
+	if err != nil {
+		return nil, err
+	}
+
+	// Refund any stake locked by a prior subscription before overwriting it.
+	if prior, found := s.Keeper.GetSubscription(ctx, msg.Subscriber); found && prior.StakeAmount > 0 {
+		refund := sdk.NewInt64Coin(sdk.DefaultBondDenom, prior.StakeAmount)
+		if err := s.Keeper.bankKeeper.SendCoinsFromModuleToAccount(
+			ctx, types.ModuleName, subscriber, sdk.NewCoins(refund),
+		); err != nil {
+			return nil, errors.Wrap(err, "failed to refund prior stake")
+		}
+	}
+
+	// Check subscriber has enough spendable coins
+	coins := s.Keeper.bankKeeper.SpendableCoins(ctx, subscriber)
+	stakeNeeded := sdk.NewInt64Coin(sdk.DefaultBondDenom, cfg.StakeRequired)
+	if coins.AmountOf(sdk.DefaultBondDenom).LT(stakeNeeded.Amount) {
+		return nil, errors.Wrap(types.ErrInsufficientReputation,
+			"insufficient balance for stake")
+	}
+
+	// Lock tokens: subscriber → attestation module
+	if err := s.Keeper.bankKeeper.SendCoinsFromAccountToModule(
+		ctx, subscriber, types.ModuleName, sdk.NewCoins(stakeNeeded),
+	); err != nil {
+		return nil, errors.Wrap(err, "failed to lock stake")
+	}
+
+	// Store subscription record
+	now := ctx.BlockTime().Unix()
+	expiresAt := now + int64(cfg.LockDays)*86400
+
+	rec := types.SubscriptionRecord{
+		Subscriber:  msg.Subscriber,
+		Tier:        tier,
+		StakeAmount: cfg.StakeRequired,
+		StartedAt:   now,
+		ExpiresAt:   expiresAt,
+	}
+	s.Keeper.SetSubscription(ctx, rec)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"subscribe",
+		sdk.NewAttribute(types.AttributeKeyAttester, msg.Subscriber),
+		sdk.NewAttribute("tier", tier.String()),
+		sdk.NewAttribute("stake", stakeNeeded.String()),
+	))
+
+	return &msgs.MsgSubscribeResponse{
+		Tier:        tier.String(),
+		ExpiresAt:   expiresAt,
+		StakeLocked: stakeNeeded.String(),
+	}, nil
+}
+
+// ============================================================
+// Unsubscribe — cancel API subscription
+// ============================================================
+
+// Unsubscribe returns locked tokens and resets to the FREE tier.
+func (s *MsgServer) Unsubscribe(goCtx context.Context, msg *msgs.MsgUnsubscribe) (*msgs.MsgUnsubscribeResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	if err := msg.ValidateBasic(); err != nil {
+		return nil, err
+	}
+
+	rec, found := s.Keeper.GetSubscription(ctx, msg.Subscriber)
+	if !found {
+		return nil, errors.Wrap(types.ErrSubscriptionNotFound, "no active subscription")
+	}
+
+	if rec.Tier == types.SubscriptionTier_FREE {
+		return nil, errors.Wrap(types.ErrSubscriptionNotFound, "already on free tier")
+	}
+
+	subscriber, err := sdk.AccAddressFromBech32(msg.Subscriber)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return locked tokens
+	refund := sdk.NewInt64Coin(sdk.DefaultBondDenom, rec.StakeAmount)
+	if err := s.Keeper.bankKeeper.SendCoinsFromModuleToAccount(
+		ctx, types.ModuleName, subscriber, sdk.NewCoins(refund),
+	); err != nil {
+		return nil, errors.Wrap(err, "failed to return stake")
+	}
+
+	s.Keeper.DeleteSubscription(ctx, msg.Subscriber)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"unsubscribe",
+		sdk.NewAttribute(types.AttributeKeyAttester, msg.Subscriber),
+		sdk.NewAttribute("refund", refund.String()),
+	))
+
+	return &msgs.MsgUnsubscribeResponse{
+		UnlockedAmount: refund.String(),
+	}, nil
 }

@@ -59,12 +59,12 @@ if [[ ! -d "${CHAIN_HOME}/config" ]]; then
 
   ${TA} init "${MONIKER}" \
     --chain-id "${CHAIN_ID}" \
-    --default-denom "${DENOM}" 2>/dev/null
+    --default-denom "${DENOM}"
 
   # Create validator key
   ${TA} keys add "${KEY_NAME}" \
     --keyring-backend "${KEYRING_BACKEND}" \
-    --output json 2>/dev/null | \
+    --output json | \
     python3 -c "
 import sys, json
 try:
@@ -74,20 +74,20 @@ try:
         f.write(d.get('mnemonic',''))
     print('[entrypoint] ⚠  Mnemonic saved to /tmp/validator_mnemonic.txt — DELETE after use')
 except: pass
-" 2>/dev/null || true
+" || true
 
   VALIDATOR_ADDR=$(${TA} keys show "${KEY_NAME}" \
     --keyring-backend "${KEYRING_BACKEND}" \
-    --address 2>/dev/null)
+    --address)
 
   info "Validator address: ${VALIDATOR_ADDR}"
 
   # Add genesis account
-  ${TA} genesis add-genesis-account "${VALIDATOR_ADDR}" "${SUPPLY_AMOUNT}" \
-    --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null
+  ${TA} add-genesis-account "${VALIDATOR_ADDR}" "${SUPPLY_AMOUNT}" \
+    --keyring-backend "${KEYRING_BACKEND}"
 
   # Create gentx
-  ${TA} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+  ${TA} gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
     --chain-id "${CHAIN_ID}" \
     --moniker "${MONIKER}" \
     --keyring-backend "${KEYRING_BACKEND}" \
@@ -95,9 +95,8 @@ except: pass
     --commission-max-rate "0.20" \
     --commission-max-change-rate "0.01" \
     --min-self-delegation "1" \
-    2>/dev/null
 
-  ${TA} genesis collect-gentxs 2>/dev/null
+  ${TA} collect-gentxs
 
   # Patch config
   GENESIS="${CHAIN_HOME}/config/genesis.json"

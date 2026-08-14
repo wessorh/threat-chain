@@ -3,6 +3,7 @@
 package msgs
 
 import (
+	"fmt"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -16,35 +17,35 @@ import (
 
 // MsgPublishAttestation submits a new threat attestation to the chain.
 type MsgPublishAttestation struct {
-	Attester         string                    `json:"attester"`
-	ArtifactType     types.ArtifactType        `json:"artifact_type"`
+	Attester     string             `json:"attester"`
+	ArtifactType types.ArtifactType `json:"artifact_type"`
 	// ArtifactSHA256 is the canonical SHA-256 hex of the artifact.
 	// For URL: SHA-256 of the normalized UTF-8 URL bytes.
 	// For IPv4: SHA-256 of the 4-byte big-endian packed address.
 	// For FILE: SHA-256 of the raw file bytes.
-	ArtifactSHA256   string                    `json:"artifact_sha256"`
+	ArtifactSHA256 string `json:"artifact_sha256"`
 	// RawValue is the human-readable value (URL string, IPv4 string, or empty for files).
-	RawValue         string                    `json:"raw_value,omitempty"`
-	Severity         types.SeverityLevel       `json:"severity"`
-	TLP              types.TLPLevel            `json:"tlp"`
-	TTLSeconds       int64                     `json:"ttl_seconds"`
-	Confidence       uint32                    `json:"confidence"`
-	Description      string                    `json:"description,omitempty"`
-	Tags             []string                  `json:"tags,omitempty"`
-	ThreatCategories []string                  `json:"threat_categories,omitempty"`
-	DetectionRules   []types.DetectionRuleRef  `json:"detection_rules,omitempty"`
-	RelatedTo        []string                  `json:"related_to,omitempty"`
-	MitreAttackIDs   []string                  `json:"mitre_attack_ids,omitempty"`
-	AttesterSig      string                    `json:"attester_sig"`
+	RawValue         string                   `json:"raw_value,omitempty"`
+	Severity         types.SeverityLevel      `json:"severity"`
+	TLP              types.TLPLevel           `json:"tlp"`
+	TTLSeconds       int64                    `json:"ttl_seconds"`
+	Confidence       uint32                   `json:"confidence"`
+	Description      string                   `json:"description,omitempty"`
+	Tags             []string                 `json:"tags,omitempty"`
+	ThreatCategories []string                 `json:"threat_categories,omitempty"`
+	DetectionRules   []types.DetectionRuleRef `json:"detection_rules,omitempty"`
+	RelatedTo        []string                 `json:"related_to,omitempty"`
+	MitreAttackIDs   []string                 `json:"mitre_attack_ids,omitempty"`
+	AttesterSig      string                   `json:"attester_sig"`
 	// PUAInfo carries Potentially Unwanted Application metadata.
 	// Must only be set when ArtifactType == FILE and ThreatCategories contains "TATST:PUA".
-	PUAInfo          *types.PUAMetadata        `json:"pua_info,omitempty"`
+	PUAInfo *types.PUAMetadata `json:"pua_info,omitempty"`
 	// AttesterDomain is the normalized domain name of the attester's DNS identity.
 	// When set, the keeper will cross-check that a live DNS identity record exists
 	// for msg.Attester with this domain and selector before storing the attestation.
-	AttesterDomain   string                    `json:"attester_domain,omitempty"`
+	AttesterDomain string `json:"attester_domain,omitempty"`
 	// AttesterSelector is the DNS selector for the attester's active TAT key record.
-	AttesterSelector string                    `json:"attester_selector,omitempty"`
+	AttesterSelector string `json:"attester_selector,omitempty"`
 }
 
 // Route implements sdk.Msg (legacy).
@@ -241,8 +242,8 @@ func (m *MsgEndorseAttestation) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{addr}
 }
 
-func (m *MsgEndorseAttestation) ProtoMessage() {}
-func (m *MsgEndorseAttestation) Reset()        {}
+func (m *MsgEndorseAttestation) ProtoMessage()  {}
+func (m *MsgEndorseAttestation) Reset()         {}
 func (m *MsgEndorseAttestation) String() string { return m.AttestationID }
 
 // ============================================================
@@ -277,8 +278,8 @@ func (m *MsgRevokeAttestation) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{addr}
 }
 
-func (m *MsgRevokeAttestation) ProtoMessage() {}
-func (m *MsgRevokeAttestation) Reset()        {}
+func (m *MsgRevokeAttestation) ProtoMessage()  {}
+func (m *MsgRevokeAttestation) Reset()         {}
 func (m *MsgRevokeAttestation) String() string { return m.AttestationID }
 
 // ============================================================
@@ -287,11 +288,11 @@ func (m *MsgRevokeAttestation) String() string { return m.AttestationID }
 
 // MsgDisputeAttestation files a dispute against an existing attestation.
 type MsgDisputeAttestation struct {
-	Disputer      string                `json:"disputer"`
-	AttestationID string                `json:"attestation_id"`
-	Ground        types.DisputeGround   `json:"ground"`
-	Evidence      string                `json:"evidence,omitempty"`
-	EvidenceCID   string                `json:"evidence_cid,omitempty"`
+	Disputer      string              `json:"disputer"`
+	AttestationID string              `json:"attestation_id"`
+	Ground        types.DisputeGround `json:"ground"`
+	Evidence      string              `json:"evidence,omitempty"`
+	EvidenceCID   string              `json:"evidence_cid,omitempty"`
 }
 
 func (m *MsgDisputeAttestation) Route() string { return types.ModuleName }
@@ -324,8 +325,8 @@ func (m *MsgDisputeAttestation) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{addr}
 }
 
-func (m *MsgDisputeAttestation) ProtoMessage() {}
-func (m *MsgDisputeAttestation) Reset()        {}
+func (m *MsgDisputeAttestation) ProtoMessage()  {}
+func (m *MsgDisputeAttestation) Reset()         {}
 func (m *MsgDisputeAttestation) String() string { return m.AttestationID }
 
 // ============================================================
@@ -353,8 +354,8 @@ func (m *MsgUpdateParams) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{addr}
 }
 
-func (m *MsgUpdateParams) ProtoMessage() {}
-func (m *MsgUpdateParams) Reset()        {}
+func (m *MsgUpdateParams) ProtoMessage()  {}
+func (m *MsgUpdateParams) Reset()         {}
 func (m *MsgUpdateParams) String() string { return "update_params" }
 
 // ============================================================
@@ -377,3 +378,141 @@ type MsgDisputeAttestationResponse struct {
 }
 
 type MsgUpdateParamsResponse struct{}
+
+// ============================================================
+// MsgClaimReward — claim attestation incentive pool rewards
+// ============================================================
+
+// MsgClaimReward allows an attester to claim their share of the
+// attestation module's incentive pool. Rewards are tier-scaled.
+type MsgClaimReward struct {
+	Attester string `json:"attester"`
+}
+
+// ValidateBasic performs stateless validation of MsgClaimReward.
+func (m *MsgClaimReward) ValidateBasic() error {
+	if _, err := sdk.AccAddressFromBech32(m.Attester); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Route returns the message route.
+func (m *MsgClaimReward) Route() string { return types.ModuleName }
+
+// Type returns the message type.
+func (m *MsgClaimReward) Type() string { return "claim-reward" }
+
+// GetSigners returns the expected signers.
+func (m *MsgClaimReward) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Attester)
+	return []sdk.AccAddress{addr}
+}
+
+// ProtoMessage is a no-op marker for the proto.Message interface.
+func (*MsgClaimReward) ProtoMessage() {}
+func (*MsgClaimReward) Reset()        {}
+func (m *MsgClaimReward) String() string {
+	return fmt.Sprintf("MsgClaimReward{%s}", m.Attester)
+}
+
+type MsgClaimRewardResponse struct {
+	ClaimedAmount string `json:"claimed_amount"`
+	PoolRemaining string `json:"pool_remaining"`
+}
+
+// ============================================================
+// MsgSubscribe — API tier subscription
+// ============================================================
+
+// MsgSubscribe locks tokens to activate a paid API tier.
+type MsgSubscribe struct {
+	Subscriber string `json:"subscriber"`
+	Tier       int32  `json:"tier"` // 0=FREE, 1=PRO, 2=ENTERPRISE
+}
+
+func (m *MsgSubscribe) ValidateBasic() error {
+	if _, err := sdk.AccAddressFromBech32(m.Subscriber); err != nil {
+		return err
+	}
+	if m.Tier < 0 || m.Tier > 2 {
+		return types.ErrInvalidConfidence // reuse: out of range
+	}
+	return nil
+}
+
+func (m *MsgSubscribe) Route() string { return types.ModuleName }
+func (m *MsgSubscribe) Type() string  { return "subscribe" }
+func (m *MsgSubscribe) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Subscriber)
+	return []sdk.AccAddress{addr}
+}
+func (*MsgSubscribe) ProtoMessage() {}
+func (*MsgSubscribe) Reset()        {}
+func (m *MsgSubscribe) String() string {
+	return fmt.Sprintf("MsgSubscribe{%s tier=%d}", m.Subscriber, m.Tier)
+}
+
+type MsgSubscribeResponse struct {
+	Tier        string `json:"tier"`
+	ExpiresAt   int64  `json:"expires_at"`
+	StakeLocked string `json:"stake_locked"`
+}
+
+// ============================================================
+// MsgUnsubscribe — cancel API subscription
+// ============================================================
+
+// MsgUnsubscribe unlocks tokens and returns to the FREE tier.
+type MsgUnsubscribe struct {
+	Subscriber string `json:"subscriber"`
+}
+
+func (m *MsgUnsubscribe) ValidateBasic() error {
+	if _, err := sdk.AccAddressFromBech32(m.Subscriber); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MsgUnsubscribe) Route() string { return types.ModuleName }
+func (m *MsgUnsubscribe) Type() string  { return "unsubscribe" }
+func (m *MsgUnsubscribe) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Subscriber)
+	return []sdk.AccAddress{addr}
+}
+func (*MsgUnsubscribe) ProtoMessage()    {}
+func (*MsgUnsubscribe) Reset()           {}
+func (m *MsgUnsubscribe) String() string { return fmt.Sprintf("MsgUnsubscribe{%s}", m.Subscriber) }
+
+type MsgUnsubscribeResponse struct {
+	UnlockedAmount string `json:"unlocked_amount"`
+}
+
+// XXX_MessageName returns the fully-qualified message name used to derive the
+// sdk.Msg type URL (and hence the MsgServiceRouter route key). Required so
+// that each handwritten message resolves to a distinct type URL.
+func (*MsgPublishAttestation) XXX_MessageName() string {
+	return "threatattest.attestation.MsgPublishAttestation"
+}
+func (*MsgEndorseAttestation) XXX_MessageName() string {
+	return "threatattest.attestation.MsgEndorseAttestation"
+}
+func (*MsgRevokeAttestation) XXX_MessageName() string {
+	return "threatattest.attestation.MsgRevokeAttestation"
+}
+func (*MsgDisputeAttestation) XXX_MessageName() string {
+	return "threatattest.attestation.MsgDisputeAttestation"
+}
+func (*MsgUpdateParams) XXX_MessageName() string {
+	return "threatattest.attestation.MsgUpdateParams"
+}
+func (*MsgClaimReward) XXX_MessageName() string {
+	return "threatattest.attestation.MsgClaimReward"
+}
+func (*MsgSubscribe) XXX_MessageName() string {
+	return "threatattest.attestation.MsgSubscribe"
+}
+func (*MsgUnsubscribe) XXX_MessageName() string {
+	return "threatattest.attestation.MsgUnsubscribe"
+}

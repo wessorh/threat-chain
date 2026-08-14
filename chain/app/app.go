@@ -27,11 +27,11 @@ import (
 
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
-	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/server/api"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
@@ -72,9 +72,9 @@ import (
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	cmtservice "github.com/cosmos/cosmos-sdk/client/grpc/cmtservice"
 	nodeservice "github.com/cosmos/cosmos-sdk/client/grpc/node"
+	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 
 	tatante "github.com/threatattest/chain/ante"
 	attestation "github.com/threatattest/chain/x/attestation"
@@ -161,6 +161,7 @@ func NewThreatAttestApp(
 	sdkCfg.SetBech32PrefixForAccount(Bech32Prefix, Bech32Prefix+"pub")
 	sdkCfg.SetBech32PrefixForValidator(Bech32Prefix+"valoper", Bech32Prefix+"valoperpub")
 	sdkCfg.SetBech32PrefixForConsensusNode(Bech32Prefix+"valcons", Bech32Prefix+"valconspub")
+	sdk.DefaultBondDenom = BondDenom
 
 	interfaceRegistry, _ := codectypes.NewInterfaceRegistryWithOptions(
 		codectypes.InterfaceRegistryOptions{},

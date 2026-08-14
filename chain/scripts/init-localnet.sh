@@ -90,7 +90,7 @@ if [[ -d "${HOME_DIR}/config" ]]; then
   exit 0
 fi
 
-${TA} init "${MONIKER}" --chain-id "${CHAIN_ID}" --default-denom "${DENOM}" 2>/dev/null
+${TA} init "${MONIKER}" --chain-id "${CHAIN_ID}" --default-denom "${DENOM}"
 success "Chain initialised"
 
 # ─── Step 2: Create validator key ────────────────────────────────────────────
@@ -98,42 +98,59 @@ step "2. Create validator key"
 
 ${TA} keys add "${KEY_NAME}" \
   --keyring-backend "${KEYRING_BACKEND}" \
-  --output json 2>/dev/null | \
-  python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-print('  Address  :', d.get('address',''))
-print('  Mnemonic :', d.get('mnemonic','')[0:40]+'...')
+  --output json 2>/tmp/ta-key.json
+
+python3 -c "
+import json
+with open('/tmp/ta-key.json') as f:
+    d = json.load(f)
+    print('  Address  :', d.get('address',''))
+    print('  Mnemonic :', d.get('mnemonic','')[0:40]+'...')
 "
 success "Key '${KEY_NAME}' created (keyring: ${KEYRING_BACKEND})"
 
-VALIDATOR_ADDR=$(${TA} keys show "${KEY_NAME}" \
-  --keyring-backend "${KEYRING_BACKEND}" \
-  --address)
+# Extract address and public key from the JSON file
+KEY_INFO=$(python3 -c "
+import json
+with open('/tmp/ta-key.json') as f:
+    d = json.load(f)
+addr = d.get('address','')
+pk = d.get('pubkey','')
+if isinstance(pk, str) and pk.startswith('{'):
+    pk = json.loads(pk).get('key','')
+print(f'{addr} {pk}')
+")
+VALIDATOR_ADDR="${KEY_INFO%% *}"
+VALIDATOR_PUBKEY="${KEY_INFO#* }"
 info "Validator address: ${VALIDATOR_ADDR}"
+
+if [[ -n "${VALIDATOR_PUBKEY}" ]]; then
+  echo ""
+  info "To bind this identity to a domain, publish this DNS TXT record:\n"
+  echo -e "  ${BOLD}_tat.validator.plan10.org.  3600  IN  TXT  \"v=TAT1 k=secp256k1 p=${VALIDATOR_PUBKEY} a=${VALIDATOR_ADDR}\"${RESET}"
+  echo ""
+fi
 
 # ─── Step 3: Add genesis account ─────────────────────────────────────────────
 step "3. Add genesis account"
 
-${TA} genesis add-genesis-account "${VALIDATOR_ADDR}" "${SUPPLY_AMOUNT}" \
-  --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null
+${TA} add-genesis-account "${VALIDATOR_ADDR}" "${SUPPLY_AMOUNT}"
 success "Genesis account: ${VALIDATOR_ADDR} → ${SUPPLY_AMOUNT}"
 
 # ─── Step 4: Create genesis validator tx ─────────────────────────────────────
 step "4. Create gentx (self-delegation)"
 
-${TA} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+${TA} gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
   --chain-id "${CHAIN_ID}" \
   --moniker "${MONIKER}" \
   --keyring-backend "${KEYRING_BACKEND}" \
   --commission-rate "0.10" \
   --commission-max-rate "0.20" \
   --commission-max-change-rate "0.01" \
-  --min-self-delegation "1" \
-  2>/dev/null
+  --min-self-delegation "1"
 success "Gentx created"
 
-${TA} genesis collect-gentxs 2>/dev/null
+${TA} collect-gentxs
 success "Gentxs collected"
 
 # ─── Step 5: Patch genesis.json ──────────────────────────────────────────────
@@ -254,7 +271,7 @@ PYEOF
 # ─── Step 7: Validate genesis ─────────────────────────────────────────────────
 step "7. Validate genesis"
 
-${TA} genesis validate 2>/dev/null && success "Genesis valid" || \
+${TA} validate-genesis && success "Genesis valid" || \
   warn "Genesis validation warning (may be ok for non-standard modules)"
 
 # ─── Done ────────────────────────────────────────────────────────────────────
@@ -267,4 +284,21 @@ echo "  REST API   : http://localhost:1317"
 echo "  gRPC       : localhost:9090"
 echo "  Validator  : ${VALIDATOR_ADDR}"
 echo "  Home dir   : ${HOME_DIR}"
+echo ""
+echo -e "${BOLD}${CYAN}── DNS Records for plan10.org ──${RESET}"
+echo ""
+echo -e "  ${BOLD}; Chain node services — point A records at the node's public IP${RESET}"
+echo ""
+echo "  api.plan10.org.         3600  IN  A     <node-public-ip>"
+echo "  rpc.plan10.org.         3600  IN  A     <node-public-ip>"
+echo "  grpc.plan10.org.        3600  IN  A     <node-public-ip>"
+echo "  p2p.plan10.org.         3600  IN  A     <node-public-ip>"
+echo ""
+echo -e "  ${BOLD}; Attester identity binding — one per attester${RESET}"
+echo ""
+echo "  _tat.validator.plan10.org.  3600  IN  TXT  \"v=TAT1 k=secp256k1 p=${VALIDATOR_PUBKEY:-<pubkey-hex>} a=${VALIDATOR_ADDR}\""
+echo ""
+echo -e "  ${BOLD}; config.toml external_address${RESET}"
+echo ""
+echo "  external_address = \"p2p.plan10.org:26656\""
 echo ""

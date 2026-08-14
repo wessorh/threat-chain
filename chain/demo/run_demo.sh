@@ -65,7 +65,7 @@ success "Ready for fresh initialisation"
 # ── Initialise the chain ────────────────────────────────────────────────────
 section "Step 2 — Initialise the chain"
 info "Running: threatattestd init"
-"$BINARY" init "$MONIKER" --chain-id "$CHAIN_ID" --home "$HOME_DIR" 2>/dev/null
+"$BINARY" init "$MONIKER" --chain-id "$CHAIN_ID" --home "$HOME_DIR"
 success "Chain initialised at $HOME_DIR"
 
 # ── Create a demo key ───────────────────────────────────────────────────────
@@ -74,12 +74,12 @@ info "Adding key: $KEY_NAME"
 "$BINARY" keys add "$KEY_NAME" \
     --keyring-backend test \
     --home "$HOME_DIR" \
-    --output json 2>/dev/null | tee /tmp/demo_key.json
+    --output json  | tee /tmp/demo_key.json
 
 ATTESTER_ADDR=$("$BINARY" keys show "$KEY_NAME" \
     --keyring-backend test \
     --home "$HOME_DIR" \
-    --address 2>/dev/null)
+    --address)
 success "Attester address: $ATTESTER_ADDR"
 
 # ── Fund the genesis account ─────────────────────────────────────────────────
@@ -87,7 +87,7 @@ section "Step 4 — Fund genesis account"
 info "Adding genesis account with 10,000,000 $DENOM"
 "$BINARY" add-genesis-account "$ATTESTER_ADDR" "10000000$DENOM" \
     --keyring-backend test \
-    --home "$HOME_DIR" 2>/dev/null
+    --home "$HOME_DIR"
 success "Genesis account funded"
 
 # ── Create genesis validator tx ──────────────────────────────────────────────
@@ -96,17 +96,17 @@ info "Generating gentx (self-delegation: 1,000,000 $DENOM)"
 "$BINARY" gentx "$KEY_NAME" "1000000$DENOM" \
     --chain-id "$CHAIN_ID" \
     --keyring-backend test \
-    --home "$HOME_DIR" 2>/dev/null
+    --home "$HOME_DIR"
 success "Gentx created"
 
 # ── Collect gentxs ──────────────────────────────────────────────────────────
 section "Step 6 — Collect genesis transactions"
-"$BINARY" collect-gentxs --home "$HOME_DIR" 2>/dev/null
+"$BINARY" collect-gentxs --home "$HOME_DIR"
 success "genesis.json finalised"
 
 # ── Validate genesis ─────────────────────────────────────────────────────────
 section "Step 7 — Validate genesis"
-"$BINARY" validate --home "$HOME_DIR" 2>/dev/null
+"$BINARY" validate-genesis --home "$HOME_DIR"
 success "Genesis file is valid"
 
 # ── Start node in background ─────────────────────────────────────────────────

@@ -48,7 +48,11 @@ func (AppModuleBasic) Name() string { return types.ModuleName }
 // RegisterCodec registers legacy amino codec types.
 func (AppModuleBasic) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
 
-// RegisterInterfaces is a no-op (protobuf codec registration done at app level).
+// RegisterInterfaces registers the module's sdk.Msg types with the codec.
+// The messages are handwritten (no generated .pb.go), so this is currently a
+// no-op. Once protobuf descriptors exist, this should call
+// registry.RegisterImplementations((*sdk.Msg)(nil), &attestmsgs.MsgPublishAttestation{}, ...)
+// for every message so the MsgServiceRouter can decode and route them.
 func (AppModuleBasic) RegisterInterfaces(_ codectypes.InterfaceRegistry) {}
 
 // DefaultGenesis returns the default genesis state JSON.
@@ -148,6 +152,10 @@ func (am AppModule) IsAppModule() {}
 // ============================================================
 
 func registerMsgRoutes(srv grpc.ServiceRegistrar, ms *keeper.MsgServer) {
+	// Message routing is unwired: registering the MsgServer requires a generated
+	// grpc.ServiceDesc (from .pb.go). Once generated, this should be
+	// types.RegisterMsgServer(srv, ms). Until then messages cannot be dispatched
+	// through the standard MsgServiceRouter.
 	_ = srv
 	_ = ms
 }
@@ -198,6 +206,30 @@ func (am AppModule) MsgHandlers() map[string]func(ctx sdk.Context, msg sdk.Msg) 
 		},
 		sdk.MsgTypeURL(&attestmsgs.MsgUpdateParams{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
 			resp, err := am.msgServer.UpdateParams(ctx, msg.(*attestmsgs.MsgUpdateParams))
+			if err != nil {
+				return sdk.Result{}, err
+			}
+			bz, _ := json.Marshal(resp)
+			return sdk.Result{Data: bz}, nil
+		},
+		sdk.MsgTypeURL(&attestmsgs.MsgClaimReward{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
+			resp, err := am.msgServer.ClaimReward(ctx, msg.(*attestmsgs.MsgClaimReward))
+			if err != nil {
+				return sdk.Result{}, err
+			}
+			bz, _ := json.Marshal(resp)
+			return sdk.Result{Data: bz}, nil
+		},
+		sdk.MsgTypeURL(&attestmsgs.MsgSubscribe{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
+			resp, err := am.msgServer.Subscribe(ctx, msg.(*attestmsgs.MsgSubscribe))
+			if err != nil {
+				return sdk.Result{}, err
+			}
+			bz, _ := json.Marshal(resp)
+			return sdk.Result{Data: bz}, nil
+		},
+		sdk.MsgTypeURL(&attestmsgs.MsgUnsubscribe{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
+			resp, err := am.msgServer.Unsubscribe(ctx, msg.(*attestmsgs.MsgUnsubscribe))
 			if err != nil {
 				return sdk.Result{}, err
 			}

@@ -42,8 +42,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
-	"github.com/cosmos/cosmos-sdk/x/crisis"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/spf13/cobra"
@@ -124,7 +124,7 @@ func initRootCmd(rootCmd *cobra.Command, clientCtx client.Context) {
 			valAddrCodec,
 		),
 		genutilcli.ValidateGenesisCmd(newBasicManager()),
-		addGenesisAccountCmd(DefaultNodeHome),
+		addGenesisAccountCmd(DefaultNodeHome, tatapp.Bech32Prefix),
 		debug.Cmd(),
 		confixcmd.ConfigCommand(),
 		pruning.Cmd(newApp, DefaultNodeHome),
@@ -170,8 +170,8 @@ type AttestationSpec struct {
 	ExpiresAt      int64    `json:"expires_at"`
 	ChainID        string   `json:"chain_id,omitempty"`
 	// Computed fields displayed to the user
-	FileSizeBytes  int64  `json:"file_size_bytes,omitempty"`
-	FileName       string `json:"file_name,omitempty"`
+	FileSizeBytes int64  `json:"file_size_bytes,omitempty"`
+	FileName      string `json:"file_name,omitempty"`
 }
 
 // attestFileCmd returns the attest-file command which computes a file's SHA-256,
@@ -264,16 +264,16 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 	artifactSHA256 := hex.EncodeToString(h.Sum(nil))
 
 	// ── Read flags ────────────────────────────────────────────────────────────
-	severity, _     := cmd.Flags().GetString("severity")
-	confidence, _   := cmd.Flags().GetInt("confidence")
-	ttl, _          := cmd.Flags().GetInt64("ttl")
-	description, _  := cmd.Flags().GetString("description")
-	tags, _         := cmd.Flags().GetStringSlice("tags")
-	categories, _   := cmd.Flags().GetStringSlice("category")
-	attester, _     := cmd.Flags().GetString("attester")
-	outputPath, _   := cmd.Flags().GetString("output")
-	chainID, _      := cmd.Flags().GetString("chain-id")
-	dryRun, _       := cmd.Flags().GetBool("dry-run")
+	severity, _ := cmd.Flags().GetString("severity")
+	confidence, _ := cmd.Flags().GetInt("confidence")
+	ttl, _ := cmd.Flags().GetInt64("ttl")
+	description, _ := cmd.Flags().GetString("description")
+	tags, _ := cmd.Flags().GetStringSlice("tags")
+	categories, _ := cmd.Flags().GetStringSlice("category")
+	attester, _ := cmd.Flags().GetString("attester")
+	outputPath, _ := cmd.Flags().GetString("output")
+	chainID, _ := cmd.Flags().GetString("chain-id")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	// ── Validate parameters ───────────────────────────────────────────────────
 	validSeverities := map[string]bool{
@@ -400,7 +400,6 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-
 // ============================================================
 // attest-url — convenience command for URL / phishing attestations
 // ============================================================
@@ -475,16 +474,16 @@ func runAttestURL(cmd *cobra.Command, args []string) error {
 	artifactSHA256 := hex.EncodeToString(h[:])
 
 	// Read flags
-	severity, _    := cmd.Flags().GetString("severity")
-	confidence, _  := cmd.Flags().GetInt("confidence")
-	ttl, _         := cmd.Flags().GetInt64("ttl")
+	severity, _ := cmd.Flags().GetString("severity")
+	confidence, _ := cmd.Flags().GetInt("confidence")
+	ttl, _ := cmd.Flags().GetInt64("ttl")
 	description, _ := cmd.Flags().GetString("description")
-	tags, _        := cmd.Flags().GetStringSlice("tags")
-	categories, _  := cmd.Flags().GetStringSlice("category")
-	attester, _    := cmd.Flags().GetString("attester")
-	outputPath, _  := cmd.Flags().GetString("output")
-	chainID, _     := cmd.Flags().GetString("chain-id")
-	dryRun, _      := cmd.Flags().GetBool("dry-run")
+	tags, _ := cmd.Flags().GetStringSlice("tags")
+	categories, _ := cmd.Flags().GetStringSlice("category")
+	attester, _ := cmd.Flags().GetString("attester")
+	outputPath, _ := cmd.Flags().GetString("output")
+	chainID, _ := cmd.Flags().GetString("chain-id")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	validSeverities := map[string]bool{
 		"UNSPECIFIED": true, "LOW": true, "MEDIUM": true, "HIGH": true, "CRITICAL": true,
@@ -651,16 +650,16 @@ func runAttestDomain(cmd *cobra.Command, args []string) error {
 	artifactSHA256 := hex.EncodeToString(h[:])
 
 	// Read flags
-	severity, _    := cmd.Flags().GetString("severity")
-	confidence, _  := cmd.Flags().GetInt("confidence")
-	ttl, _         := cmd.Flags().GetInt64("ttl")
+	severity, _ := cmd.Flags().GetString("severity")
+	confidence, _ := cmd.Flags().GetInt("confidence")
+	ttl, _ := cmd.Flags().GetInt64("ttl")
 	description, _ := cmd.Flags().GetString("description")
-	tags, _        := cmd.Flags().GetStringSlice("tags")
-	categories, _  := cmd.Flags().GetStringSlice("category")
-	attester, _    := cmd.Flags().GetString("attester")
-	outputPath, _  := cmd.Flags().GetString("output")
-	chainID, _     := cmd.Flags().GetString("chain-id")
-	dryRun, _      := cmd.Flags().GetBool("dry-run")
+	tags, _ := cmd.Flags().GetStringSlice("tags")
+	categories, _ := cmd.Flags().GetStringSlice("category")
+	attester, _ := cmd.Flags().GetString("attester")
+	outputPath, _ := cmd.Flags().GetString("output")
+	chainID, _ := cmd.Flags().GetString("chain-id")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	validSeverities := map[string]bool{
 		"UNSPECIFIED": true, "LOW": true, "MEDIUM": true, "HIGH": true, "CRITICAL": true,
@@ -1000,18 +999,18 @@ Examples:
     --chain-id threatattest-1 \
     --fees 500utatst`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			artifactType, _  := cmd.Flags().GetString("artifact-type")
+			artifactType, _ := cmd.Flags().GetString("artifact-type")
 			artifactSHA256, _ := cmd.Flags().GetString("artifact-sha256")
-			rawValue, _      := cmd.Flags().GetString("raw-value")
-			severity, _      := cmd.Flags().GetString("severity")
-			confidence, _    := cmd.Flags().GetInt("confidence")
-			ttl, _           := cmd.Flags().GetInt64("ttl")
-			description, _   := cmd.Flags().GetString("description")
-			tags, _             := cmd.Flags().GetStringSlice("tags")
-			categories, _       := cmd.Flags().GetStringSlice("category")
-			attesterDomain, _   := cmd.Flags().GetString("attester-domain")
+			rawValue, _ := cmd.Flags().GetString("raw-value")
+			severity, _ := cmd.Flags().GetString("severity")
+			confidence, _ := cmd.Flags().GetInt("confidence")
+			ttl, _ := cmd.Flags().GetInt64("ttl")
+			description, _ := cmd.Flags().GetString("description")
+			tags, _ := cmd.Flags().GetStringSlice("tags")
+			categories, _ := cmd.Flags().GetStringSlice("category")
+			attesterDomain, _ := cmd.Flags().GetString("attester-domain")
 			attesterSelector, _ := cmd.Flags().GetString("attester-selector")
-			from, _             := cmd.Flags().GetString("from")
+			from, _ := cmd.Flags().GetString("from")
 
 			// Validation
 			if artifactSHA256 == "" && rawValue == "" {
@@ -1172,7 +1171,7 @@ Example:
     --fees 250utatst`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _   := cmd.Flags().GetString("from")
+			from, _ := cmd.Flags().GetString("from")
 			reason, _ := cmd.Flags().GetString("reason")
 			if from == "" {
 				return errors.New("--from is required")
@@ -1210,8 +1209,8 @@ Example:
     --fees 1000utatst`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _     := cmd.Flags().GetString("from")
-			ground, _   := cmd.Flags().GetString("ground")
+			from, _ := cmd.Flags().GetString("from")
+			ground, _ := cmd.Flags().GetString("ground")
 			evidence, _ := cmd.Flags().GetString("evidence")
 			if from == "" {
 				return errors.New("--from is required")
@@ -1272,23 +1271,15 @@ func appExport(
 	return app.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, modulesToExport)
 }
 
-// addGenesisAccountCmd returns the genesis account command.
-func addGenesisAccountCmd(defaultNodeHome string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add-genesis-account [address_or_key_name] [coin][,[coin]]",
-		Short: "Add a genesis account to genesis.json",
-		Long: `Add a genesis account to genesis.json. The provided account must specify
-the account address or key name and a list of initial coins. If a key name is given,
-the address will be looked up in the local Keybase.`,
-		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.Printf("Adding genesis account %s with coins %s\n", args[0], args[1])
-			cmd.Println("Note: Full implementation requires genutilcli.AddGenesisAccountCmd.")
-			return nil
-		},
-	}
-	cmd.Flags().String(flags.FlagHome, defaultNodeHome, "The application home directory")
-	return cmd
+// addGenesisAccountCmd returns the genesis account command using the
+// standard Cosmos SDK genutil.AddGenesisAccount implementation. It accepts
+// a bech32 address prefix so that address decoding works correctly for
+// the chain's native prefix (tatst).
+func addGenesisAccountCmd(defaultNodeHome, bech32Prefix string) *cobra.Command {
+	return genutilcli.AddGenesisAccountCmd(
+		defaultNodeHome,
+		addresscodec.NewBech32Codec(bech32Prefix),
+	)
 }
 
 // ============================================================

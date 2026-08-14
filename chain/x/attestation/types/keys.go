@@ -8,16 +8,18 @@ const (
 	RouterKey  = ModuleName
 
 	// KVStore key prefixes
-	AttestationKeyPrefix  = 0x00
-	ArtifactIndexPrefix   = 0x01
-	AttesterIndexPrefix   = 0x02
-	ExpiryQueuePrefix     = 0x03
-	EpochCountPrefix      = 0x04
-	ParamsKey             = 0x05
-	DisputeKeyPrefix      = 0x06
-	BlacklistPrefix       = 0x07
-	EndorserSetPrefix     = 0x08
-	EpochNumberKey        = 0x09
+	AttestationKeyPrefix = 0x00
+	ArtifactIndexPrefix  = 0x01
+	AttesterIndexPrefix  = 0x02
+	ExpiryQueuePrefix    = 0x03
+	EpochCountPrefix     = 0x04
+	ParamsKey            = 0x05
+	DisputeKeyPrefix     = 0x06
+	BlacklistPrefix      = 0x07
+	EndorserSetPrefix    = 0x08
+	EpochNumberKey       = 0x09
+	SubscriptionPrefix   = 0x0A
+	ClaimEpochPrefix     = 0x0B
 )
 
 // Key builders
@@ -64,6 +66,10 @@ func EndorserSetKey(attestationID, endorser string) []byte {
 	key = append(key, []byte("|")...)
 	key = append(key, []byte(endorser)...)
 	return key
+}
+
+func ClaimEpochKey(attester string) []byte {
+	return append([]byte{ClaimEpochPrefix}, []byte(attester)...)
 }
 
 func encodeInt64BigEndian(v int64) []byte {

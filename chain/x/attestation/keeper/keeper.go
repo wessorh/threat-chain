@@ -37,18 +37,19 @@ type StakingKeeper interface {
 type BankKeeper interface {
 	SpendableCoins(ctx context.Context, addr sdk.AccAddress) sdk.Coins
 	SendCoinsFromAccountToModule(ctx context.Context, sender sdk.AccAddress, module string, coins sdk.Coins) error
+	SendCoinsFromModuleToAccount(ctx context.Context, module string, recipient sdk.AccAddress, coins sdk.Coins) error
 	BurnCoins(ctx context.Context, module string, coins sdk.Coins) error
 }
 
 // Keeper provides state access for the attestation module.
 type Keeper struct {
-	cdc            codec.BinaryCodec
-	storeService   store.KVStoreService
-	logger         log.Logger
-	repKeeper      ReputationKeeper
-	stakingKeeper  StakingKeeper
-	bankKeeper     BankKeeper
-	authority      string // gov module account address
+	cdc           codec.BinaryCodec
+	storeService  store.KVStoreService
+	logger        log.Logger
+	repKeeper     ReputationKeeper
+	stakingKeeper StakingKeeper
+	bankKeeper    BankKeeper
+	authority     string // gov module account address
 }
 
 // NewKeeper constructs a new attestation Keeper.
@@ -792,4 +793,69 @@ func prefixEndBytes(prefix []byte) []byte {
 		}
 	}
 	return nil // overflow — no upper bound
+}
+
+// ============================================================
+// Subscriptions
+// ============================================================
+
+// GetSubscription returns an active subscription record.
+func (k Keeper) GetSubscription(ctx sdk.Context, subscriber string) (types.SubscriptionRecord, bool) {
+	store := k.storeService.OpenKVStore(ctx)
+	key := append([]byte{types.SubscriptionPrefix}, []byte(subscriber)...)
+	bz, err := store.Get(key)
+	if err != nil || bz == nil {
+		return types.SubscriptionRecord{}, false
+	}
+	var rec types.SubscriptionRecord
+	if err := json.Unmarshal(bz, &rec); err != nil {
+		return types.SubscriptionRecord{}, false
+	}
+	return rec, true
+}
+
+// SetSubscription stores a subscription record.
+func (k Keeper) SetSubscription(ctx sdk.Context, rec types.SubscriptionRecord) {
+	store := k.storeService.OpenKVStore(ctx)
+	key := append([]byte{types.SubscriptionPrefix}, []byte(rec.Subscriber)...)
+	bz, _ := json.Marshal(&rec)
+	store.Set(key, bz)
+}
+
+// DeleteSubscription removes a subscription record.
+func (k Keeper) DeleteSubscription(ctx sdk.Context, subscriber string) {
+	store := k.storeService.OpenKVStore(ctx)
+	key := append([]byte{types.SubscriptionPrefix}, []byte(subscriber)...)
+	store.Delete(key)
+}
+
+// GetSubscriptionTier returns the tier for a subscriber, defaulting to FREE.
+func (k Keeper) GetSubscriptionTier(ctx sdk.Context, subscriber string) types.SubscriptionTier {
+	rec, found := k.GetSubscription(ctx, subscriber)
+	if !found || !rec.IsActive(ctx.BlockTime().Unix()) {
+		return types.SubscriptionTier_FREE
+	}
+	return rec.Tier
+}
+
+// GetClaimEpoch returns the last epoch in which the attester claimed a reward,
+// or 0 if they have never claimed.
+func (k Keeper) GetClaimEpoch(ctx sdk.Context, attester string) (uint64, error) {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := kvStore.Get(types.ClaimEpochKey(attester))
+	if err != nil {
+		return 0, err
+	}
+	if bz == nil {
+		return 0, nil
+	}
+	return binary.BigEndian.Uint64(bz), nil
+}
+
+// SetClaimEpoch records the epoch in which the attester claimed a reward.
+func (k Keeper) SetClaimEpoch(ctx sdk.Context, attester string, epoch uint64) error {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, epoch)
+	kvStore := k.storeService.OpenKVStore(ctx)
+	return kvStore.Set(types.ClaimEpochKey(attester), b)
 }
