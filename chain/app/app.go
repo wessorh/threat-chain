@@ -438,11 +438,16 @@ func NewThreatAttestApp(
 
 	// ── AnteHandler ─────────────────────────────────────────────────────────────
 
+	// TxConfig provides the sign mode handler required for ante signature
+	// verification.
+	txConfig := authtx.NewTxConfig(cdc, authtx.DefaultSignModes)
+
 	anteHandler, err := tatante.NewAnteHandler(tatante.HandlerOptions{
 		HandlerOptions: authante.HandlerOptions{
-			AccountKeeper:  app.AccountKeeper,
-			BankKeeper:     app.BankKeeper,
-			FeegrantKeeper: app.FeeGrantKeeper,
+			AccountKeeper:   app.AccountKeeper,
+			BankKeeper:      app.BankKeeper,
+			FeegrantKeeper:  app.FeeGrantKeeper,
+			SignModeHandler: txConfig.SignModeHandler(),
 		},
 		AttestKeeper: app.AttestKeeper,
 	})
