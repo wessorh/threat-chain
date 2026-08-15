@@ -59,6 +59,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/distribution"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
+	genutil "github.com/cosmos/cosmos-sdk/x/genutil"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -170,6 +172,8 @@ func NewThreatAttestApp(
 	bApp.SetCommitMultiStoreTracer(traceStore)
 	bApp.SetVersion(version.Version)
 	bApp.SetInterfaceRegistry(interfaceRegistry)
+	bApp.SetTxDecoder(encodingConfig.TxConfig.TxDecoder())
+	bApp.SetTxEncoder(encodingConfig.TxConfig.TxEncoder())
 
 	app := &ThreatAttestApp{
 		BaseApp:           bApp,
@@ -362,6 +366,7 @@ func NewThreatAttestApp(
 	// ── Module manager ──────────────────────────────────────────────────────────
 
 	app.mm = module.NewManager(
+		genutil.NewAppModule(app.AccountKeeper, app.StakingKeeper, app.BaseApp, encodingConfig.TxConfig),
 		auth.NewAppModule(cdc, app.AccountKeeper, nil, nil),
 		vesting.NewAppModule(app.AccountKeeper, app.BankKeeper),
 		bank.NewAppModule(cdc, app.BankKeeper, app.AccountKeeper, nil),
@@ -409,6 +414,7 @@ func NewThreatAttestApp(
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
 		stakingtypes.ModuleName,
+		genutiltypes.ModuleName,
 		slashingtypes.ModuleName,
 		govtypes.ModuleName,
 		crisistypes.ModuleName,

@@ -188,7 +188,7 @@ func newUnaryHandler[Srv, Req, Res any](fn func(*Srv, context.Context, *Req) (*R
 
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "threatattest.attestation.Msg",
-	HandlerType: (*keeper.MsgServer)(nil),
+	HandlerType: (*interface{})(nil),
 	Methods: []grpc.MethodDesc{
 		{MethodName: "PublishAttestation", Handler: newUnaryHandler((*keeper.MsgServer).PublishAttestation)},
 		{MethodName: "EndorseAttestation", Handler: newUnaryHandler((*keeper.MsgServer).EndorseAttestation)},
@@ -203,7 +203,7 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 
 var _Query_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "threatattest.attestation.Query",
-	HandlerType: (*attestquery.QueryServer)(nil),
+	HandlerType: (*interface{})(nil),
 	Methods: []grpc.MethodDesc{
 		{MethodName: "IsMalicious", Handler: newUnaryHandler((*attestquery.QueryServer).IsMalicious)},
 		{MethodName: "IsMaliciousURL", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousURL)},
