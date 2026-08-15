@@ -1,0 +1,36 @@
+syntax = "proto3";
+package threatattest.attestation;
+
+option go_package = "github.com/threatattest/chain/x/attestation/types/pb";
+
+// Msg service for x/attestation. The concrete message types are handwritten
+// (JSON-tagged) Go structs in the `msgs` package; these proto messages exist
+// solely so the gRPC service descriptor (and thus the MsgServiceRouter method
+// descriptors) can be registered. Fields are intentionally omitted.
+service Msg {
+  rpc PublishAttestation(MsgPublishAttestation) returns (MsgPublishAttestationResponse);
+  rpc EndorseAttestation(MsgEndorseAttestation) returns (MsgEndorseAttestationResponse);
+  rpc RevokeAttestation(MsgRevokeAttestation) returns (MsgRevokeAttestationResponse);
+  rpc DisputeAttestation(MsgDisputeAttestation) returns (MsgDisputeAttestationResponse);
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+  rpc ClaimReward(MsgClaimReward) returns (MsgClaimRewardResponse);
+  rpc Subscribe(MsgSubscribe) returns (MsgSubscribeResponse);
+  rpc Unsubscribe(MsgUnsubscribe) returns (MsgUnsubscribeResponse);
+}
+
+message MsgPublishAttestation {}
+message MsgPublishAttestationResponse {}
+message MsgEndorseAttestation {}
+message MsgEndorseAttestationResponse {}
+message MsgRevokeAttestation {}
+message MsgRevokeAttestationResponse {}
+message MsgDisputeAttestation {}
+message MsgDisputeAttestationResponse {}
+message MsgUpdateParams {}
+message MsgUpdateParamsResponse {}
+message MsgClaimReward {}
+message MsgClaimRewardResponse {}
+message MsgSubscribe {}
+message MsgSubscribeResponse {}
+message MsgUnsubscribe {}
+message MsgUnsubscribeResponse {}

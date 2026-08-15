@@ -157,15 +157,11 @@ func NewThreatAttestApp(
 	appOpts servertypes.AppOptions,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *ThreatAttestApp {
-	sdkCfg := sdk.GetConfig()
-	sdkCfg.SetBech32PrefixForAccount(Bech32Prefix, Bech32Prefix+"pub")
-	sdkCfg.SetBech32PrefixForValidator(Bech32Prefix+"valoper", Bech32Prefix+"valoperpub")
-	sdkCfg.SetBech32PrefixForConsensusNode(Bech32Prefix+"valcons", Bech32Prefix+"valconspub")
+	// Note: bech32 prefixes are set and sealed in NewRootCmd (before the app is
+	// constructed), so we must not call SetBech32Prefix* here again.
 	sdk.DefaultBondDenom = BondDenom
 
-	interfaceRegistry, _ := codectypes.NewInterfaceRegistryWithOptions(
-		codectypes.InterfaceRegistryOptions{},
-	)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	cdc := codec.NewProtoCodec(interfaceRegistry)
 	legacyAmino := codec.NewLegacyAmino()
 
@@ -428,6 +424,12 @@ func NewThreatAttestApp(
 	}
 	app.mm.SetOrderInitGenesis(genesisOrder...)
 	app.mm.SetOrderExportGenesis(genesisOrder...)
+
+	// Register message/query interfaces with the codec so transactions can be
+	// decoded and routed via the MsgServiceRouter / GRPCQueryRouter.
+	bm := module.NewBasicManagerFromManager(app.mm, nil)
+	bm.RegisterLegacyAminoCodec(legacyAmino)
+	bm.RegisterInterfaces(interfaceRegistry)
 
 	app.configurator = module.NewConfigurator(cdc, app.MsgServiceRouter(), app.GRPCQueryRouter())
 	if err := app.mm.RegisterServices(app.configurator); err != nil {

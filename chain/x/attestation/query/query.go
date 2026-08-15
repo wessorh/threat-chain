@@ -351,3 +351,64 @@ func minInt(a, b int) int {
 	}
 	return b
 }
+
+// ============================================================
+// gogoproto proto.Message implementations
+// (required so the GRPCQueryRouter can register the Query service)
+// ============================================================
+
+func (*QueryIsMaliciousRequest) Reset()                        {}
+func (*QueryIsMaliciousRequest) ProtoMessage()                 {}
+func (m *QueryIsMaliciousRequest) String() string              { return m.ArtifactSHA256 }
+func (*QueryIsMaliciousResponse) Reset()                       {}
+func (*QueryIsMaliciousResponse) ProtoMessage()                {}
+func (m *QueryIsMaliciousResponse) String() string             { return "QueryIsMaliciousResponse" }
+func (*QueryGetAttestationRequest) Reset()                     {}
+func (*QueryGetAttestationRequest) ProtoMessage()              {}
+func (m *QueryGetAttestationRequest) String() string           { return m.AttestationID }
+func (*QueryGetAttestationResponse) Reset()                    {}
+func (*QueryGetAttestationResponse) ProtoMessage()             {}
+func (m *QueryGetAttestationResponse) String() string          { return "QueryGetAttestationResponse" }
+func (*QueryListArtifactAttestationsRequest) Reset()           {}
+func (*QueryListArtifactAttestationsRequest) ProtoMessage()    {}
+func (m *QueryListArtifactAttestationsRequest) String() string { return m.ArtifactSHA256 }
+func (*QueryListArtifactAttestationsResponse) Reset()          {}
+func (*QueryListArtifactAttestationsResponse) ProtoMessage()   {}
+func (m *QueryListArtifactAttestationsResponse) String() string {
+	return "QueryListArtifactAttestationsResponse"
+}
+func (*QueryListAttesterAttestationsRequest) Reset()           {}
+func (*QueryListAttesterAttestationsRequest) ProtoMessage()    {}
+func (m *QueryListAttesterAttestationsRequest) String() string { return m.Attester }
+func (*QueryListAttesterAttestationsResponse) Reset()          {}
+func (*QueryListAttesterAttestationsResponse) ProtoMessage()   {}
+func (m *QueryListAttesterAttestationsResponse) String() string {
+	return "QueryListAttesterAttestationsResponse"
+}
+func (*QueryGetDisputeRequest) Reset()                    {}
+func (*QueryGetDisputeRequest) ProtoMessage()             {}
+func (m *QueryGetDisputeRequest) String() string          { return m.DisputeID }
+func (*QueryGetDisputeResponse) Reset()                   {}
+func (*QueryGetDisputeResponse) ProtoMessage()            {}
+func (m *QueryGetDisputeResponse) String() string         { return "QueryGetDisputeResponse" }
+func (*QueryIsBlacklistedRequest) Reset()                 {}
+func (*QueryIsBlacklistedRequest) ProtoMessage()          {}
+func (m *QueryIsBlacklistedRequest) String() string       { return m.Attester }
+func (*QueryIsBlacklistedResponse) Reset()                {}
+func (*QueryIsBlacklistedResponse) ProtoMessage()         {}
+func (m *QueryIsBlacklistedResponse) String() string      { return "QueryIsBlacklistedResponse" }
+func (*QueryParamsRequest) Reset()                        {}
+func (*QueryParamsRequest) ProtoMessage()                 {}
+func (*QueryParamsRequest) String() string                { return "QueryParamsRequest" }
+func (*QueryParamsResponse) Reset()                       {}
+func (*QueryParamsResponse) ProtoMessage()                {}
+func (*QueryParamsResponse) String() string               { return "QueryParamsResponse" }
+func (*QueryIsMaliciousURLRequest) Reset()                {}
+func (*QueryIsMaliciousURLRequest) ProtoMessage()         {}
+func (m *QueryIsMaliciousURLRequest) String() string      { return m.URL }
+func (*QueryIsMaliciousIPv4Request) Reset()               {}
+func (*QueryIsMaliciousIPv4Request) ProtoMessage()        {}
+func (m *QueryIsMaliciousIPv4Request) String() string     { return m.IPv4 }
+func (*QueryIsMaliciousHollomanRequest) Reset()           {}
+func (*QueryIsMaliciousHollomanRequest) ProtoMessage()    {}
+func (m *QueryIsMaliciousHollomanRequest) String() string { return m.HollomanSignature }

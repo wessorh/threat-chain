@@ -21,6 +21,7 @@ import (
 	attestmsgs "github.com/threatattest/chain/x/attestation/msgs"
 	attestquery "github.com/threatattest/chain/x/attestation/query"
 	"github.com/threatattest/chain/x/attestation/types"
+	_ "github.com/threatattest/chain/x/attestation/types/pb"
 )
 
 // Ensure AppModule implements all required interfaces.
@@ -48,12 +49,20 @@ func (AppModuleBasic) Name() string { return types.ModuleName }
 // RegisterCodec registers legacy amino codec types.
 func (AppModuleBasic) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
 
-// RegisterInterfaces registers the module's sdk.Msg types with the codec.
-// The messages are handwritten (no generated .pb.go), so this is currently a
-// no-op. Once protobuf descriptors exist, this should call
-// registry.RegisterImplementations((*sdk.Msg)(nil), &attestmsgs.MsgPublishAttestation{}, ...)
-// for every message so the MsgServiceRouter can decode and route them.
-func (AppModuleBasic) RegisterInterfaces(_ codectypes.InterfaceRegistry) {}
+// RegisterInterfaces registers the module's sdk.Msg types with the codec so
+// they can be decoded from tx Any values and routed by the MsgServiceRouter.
+func (AppModuleBasic) RegisterInterfaces(registry codectypes.InterfaceRegistry) {
+	registry.RegisterImplementations((*sdk.Msg)(nil),
+		&attestmsgs.MsgPublishAttestation{},
+		&attestmsgs.MsgEndorseAttestation{},
+		&attestmsgs.MsgRevokeAttestation{},
+		&attestmsgs.MsgDisputeAttestation{},
+		&attestmsgs.MsgUpdateParams{},
+		&attestmsgs.MsgClaimReward{},
+		&attestmsgs.MsgSubscribe{},
+		&attestmsgs.MsgUnsubscribe{},
+	)
+}
 
 // DefaultGenesis returns the default genesis state JSON.
 func (AppModuleBasic) DefaultGenesis(_ codec.JSONCodec) json.RawMessage {
@@ -151,18 +160,70 @@ func (am AppModule) IsAppModule() {}
 // gRPC route registration helpers
 // ============================================================
 
+// grpcMethodHandler matches grpc's unexported methodHandler type (v1.64.1 has
+// no exported grpc.MethodHandler). As a type alias it stays assignable to the
+// grpc.MethodDesc.Handler field.
+type grpcMethodHandler = func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error)
+
+// newUnaryHandler adapts a typed handler method into a grpc method handler.
+func newUnaryHandler[Srv, Req, Res any](fn func(*Srv, context.Context, *Req) (*Res, error)) grpcMethodHandler {
+	return func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+		in := new(Req)
+		if err := dec(in); err != nil {
+			return nil, err
+		}
+		// NOTE: during service registration the SDK invokes the handler with a
+		// nil srv to extract the request type URL, so cast srv lazily (inside the
+		// branches that only run for real requests).
+		if interceptor == nil {
+			return fn(srv.(*Srv), ctx, in)
+		}
+		info := &grpc.UnaryServerInfo{Server: srv}
+		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+			return fn(srv.(*Srv), ctx, req.(*Req))
+		}
+		return interceptor(ctx, in, info, handler)
+	}
+}
+
+var _Msg_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "threatattest.attestation.Msg",
+	HandlerType: (*keeper.MsgServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{MethodName: "PublishAttestation", Handler: newUnaryHandler((*keeper.MsgServer).PublishAttestation)},
+		{MethodName: "EndorseAttestation", Handler: newUnaryHandler((*keeper.MsgServer).EndorseAttestation)},
+		{MethodName: "RevokeAttestation", Handler: newUnaryHandler((*keeper.MsgServer).RevokeAttestation)},
+		{MethodName: "DisputeAttestation", Handler: newUnaryHandler((*keeper.MsgServer).DisputeAttestation)},
+		{MethodName: "UpdateParams", Handler: newUnaryHandler((*keeper.MsgServer).UpdateParams)},
+		{MethodName: "ClaimReward", Handler: newUnaryHandler((*keeper.MsgServer).ClaimReward)},
+		{MethodName: "Subscribe", Handler: newUnaryHandler((*keeper.MsgServer).Subscribe)},
+		{MethodName: "Unsubscribe", Handler: newUnaryHandler((*keeper.MsgServer).Unsubscribe)},
+	},
+}
+
+var _Query_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "threatattest.attestation.Query",
+	HandlerType: (*attestquery.QueryServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{MethodName: "IsMalicious", Handler: newUnaryHandler((*attestquery.QueryServer).IsMalicious)},
+		{MethodName: "IsMaliciousURL", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousURL)},
+		{MethodName: "IsMaliciousIPv4", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousIPv4)},
+		{MethodName: "IsMaliciousHolloman", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousHolloman)},
+		{MethodName: "GetAttestation", Handler: newUnaryHandler((*attestquery.QueryServer).GetAttestation)},
+		{MethodName: "ListArtifactAttestations", Handler: newUnaryHandler((*attestquery.QueryServer).ListArtifactAttestations)},
+		{MethodName: "ListAttesterAttestations", Handler: newUnaryHandler((*attestquery.QueryServer).ListAttesterAttestations)},
+		{MethodName: "GetDispute", Handler: newUnaryHandler((*attestquery.QueryServer).GetDispute)},
+		{MethodName: "IsBlacklisted", Handler: newUnaryHandler((*attestquery.QueryServer).IsBlacklisted)},
+		{MethodName: "Params", Handler: newUnaryHandler((*attestquery.QueryServer).Params)},
+	},
+}
+
 func registerMsgRoutes(srv grpc.ServiceRegistrar, ms *keeper.MsgServer) {
-	// Message routing is unwired: registering the MsgServer requires a generated
-	// grpc.ServiceDesc (from .pb.go). Once generated, this should be
-	// types.RegisterMsgServer(srv, ms). Until then messages cannot be dispatched
-	// through the standard MsgServiceRouter.
-	_ = srv
-	_ = ms
+	srv.RegisterService(&_Msg_serviceDesc, ms)
 }
 
 func registerQueryRoutes(srv grpc.ServiceRegistrar, qs *attestquery.QueryServer) {
-	_ = srv
-	_ = qs
+	srv.RegisterService(&_Query_serviceDesc, qs)
 }
 
 // ============================================================

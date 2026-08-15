@@ -1,0 +1,38 @@
+syntax = "proto3";
+package threatattest.attestation;
+
+option go_package = "github.com/threatattest/chain/x/attestation/types/pb";
+
+// Query service for x/attestation. Concrete request/response types are
+// handwritten Go structs in the `query` package; these proto messages exist so
+// the gRPC service descriptor can be registered.
+service Query {
+  rpc IsMalicious(QueryIsMaliciousRequest) returns (QueryIsMaliciousResponse);
+  rpc IsMaliciousURL(QueryIsMaliciousURLRequest) returns (QueryIsMaliciousResponse);
+  rpc IsMaliciousIPv4(QueryIsMaliciousIPv4Request) returns (QueryIsMaliciousResponse);
+  rpc IsMaliciousHolloman(QueryIsMaliciousHollomanRequest) returns (QueryIsMaliciousResponse);
+  rpc GetAttestation(QueryGetAttestationRequest) returns (QueryGetAttestationResponse);
+  rpc ListArtifactAttestations(QueryListArtifactAttestationsRequest) returns (QueryListArtifactAttestationsResponse);
+  rpc ListAttesterAttestations(QueryListAttesterAttestationsRequest) returns (QueryListAttesterAttestationsResponse);
+  rpc GetDispute(QueryGetDisputeRequest) returns (QueryGetDisputeResponse);
+  rpc IsBlacklisted(QueryIsBlacklistedRequest) returns (QueryIsBlacklistedResponse);
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse);
+}
+
+message QueryIsMaliciousRequest {}
+message QueryIsMaliciousResponse {}
+message QueryIsMaliciousURLRequest {}
+message QueryIsMaliciousIPv4Request {}
+message QueryIsMaliciousHollomanRequest {}
+message QueryGetAttestationRequest {}
+message QueryGetAttestationResponse {}
+message QueryListArtifactAttestationsRequest {}
+message QueryListArtifactAttestationsResponse {}
+message QueryListAttesterAttestationsRequest {}
+message QueryListAttesterAttestationsResponse {}
+message QueryGetDisputeRequest {}
+message QueryGetDisputeResponse {}
+message QueryIsBlacklistedRequest {}
+message QueryIsBlacklistedResponse {}
+message QueryParamsRequest {}
+message QueryParamsResponse {}
