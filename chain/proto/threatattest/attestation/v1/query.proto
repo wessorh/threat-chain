@@ -1,11 +1,14 @@
 syntax = "proto3";
 package threatattest.attestation;
 
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "threatattest/attestation/v1/tx.proto";
+
 option go_package = "github.com/threatattest/chain/x/attestation/types/pb";
 
-// Query service for x/attestation. Concrete request/response types are
-// handwritten Go structs in the `query` package; these proto messages exist so
-// the gRPC service descriptor can be registered.
+// Query service for x/attestation. The request/response types mirror the
+// handwritten Go structs in the `query` package; the generated types are the
+// protobuf wire form used by the gRPC query service and CLI.
 service Query {
   rpc IsMalicious(QueryIsMaliciousRequest) returns (QueryIsMaliciousResponse);
   rpc IsMaliciousURL(QueryIsMaliciousURLRequest) returns (QueryIsMaliciousResponse);
@@ -19,20 +22,124 @@ service Query {
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse);
 }
 
-message QueryIsMaliciousRequest {}
-message QueryIsMaliciousResponse {}
-message QueryIsMaliciousURLRequest {}
-message QueryIsMaliciousIPv4Request {}
-message QueryIsMaliciousHollomanRequest {}
-message QueryGetAttestationRequest {}
-message QueryGetAttestationResponse {}
-message QueryListArtifactAttestationsRequest {}
-message QueryListArtifactAttestationsResponse {}
-message QueryListAttesterAttestationsRequest {}
-message QueryListAttesterAttestationsResponse {}
-message QueryGetDisputeRequest {}
-message QueryGetDisputeResponse {}
-message QueryIsBlacklistedRequest {}
-message QueryIsBlacklistedResponse {}
+// AttestationRecord is the canonical on-chain threat intelligence record.
+message AttestationRecord {
+  string id                       = 1;
+  uint32 schema_version           = 2;
+  int32  artifact_type            = 3;
+  string artifact_sha256          = 4;
+  string holloman_signature       = 5;
+  int32  hamming_mask             = 6;
+  string raw_value                = 7;
+  int32  severity                 = 8;
+  int32  tlp                      = 9;
+  string attester                 = 10;
+  int64  published_at             = 11;
+  int64  ttl_seconds              = 12;
+  int64  expires_at               = 13;
+  uint32 confidence               = 14;
+  string description              = 15;
+  repeated string tags            = 16;
+  repeated string threat_categories = 17;
+  repeated DetectionRuleRef detection_rules = 18;
+  repeated string related_to      = 19;
+  repeated string mitre_attack_ids = 20;
+  string attester_sig             = 21;
+  int32  status                   = 22;
+  uint32 endorsement_count        = 23;
+  uint32 dispute_count            = 24;
+  string revoke_reason            = 25;
+  int64  block_height             = 26;
+  string tx_hash                  = 27;
+  PUAMetadata pua_info            = 28;
+  string attester_domain          = 29;
+  string attester_selector        = 30;
+  int32  attester_tier            = 31;
+}
+
+// DisputeRecord tracks a dispute filed against an attestation.
+message DisputeRecord {
+  string id            = 1;
+  string attestation_id = 2;
+  string disputer      = 3;
+  int32  ground        = 4;
+  string evidence      = 5;
+  string evidence_cid  = 6;
+  int64  created_at    = 7;
+  int32  status        = 8;
+  string rebuttal_cid  = 9;
+  int64  resolved_at   = 10;
+}
+
+message QueryIsMaliciousRequest {
+  string artifact_sha256 = 1;
+}
+
+message QueryIsMaliciousResponse {
+  bool   is_malicious  = 1;
+  AttestationRecord attestation = 2;
+  uint32 trust_score   = 3;
+}
+
+message QueryIsMaliciousURLRequest {
+  string url = 1;
+}
+
+message QueryIsMaliciousIPv4Request {
+  string ipv4 = 1;
+}
+
+message QueryIsMaliciousHollomanRequest {
+  string holloman_signature = 1;
+  int32  hamming_mask       = 2;
+}
+
+message QueryGetAttestationRequest {
+  string attestation_id = 1;
+}
+
+message QueryGetAttestationResponse {
+  AttestationRecord attestation = 1;
+}
+
+message QueryListArtifactAttestationsRequest {
+  string artifact_sha256 = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryListArtifactAttestationsResponse {
+  repeated AttestationRecord attestations = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryListAttesterAttestationsRequest {
+  string attester = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryListAttesterAttestationsResponse {
+  repeated AttestationRecord attestations = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryGetDisputeRequest {
+  string dispute_id = 1;
+}
+
+message QueryGetDisputeResponse {
+  DisputeRecord dispute = 1;
+}
+
+message QueryIsBlacklistedRequest {
+  string attester = 1;
+}
+
+message QueryIsBlacklistedResponse {
+  bool is_blacklisted = 1;
+}
+
 message QueryParamsRequest {}
-message QueryParamsResponse {}
+
+message QueryParamsResponse {
+  Params params = 1;
+}

@@ -13,7 +13,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"google.golang.org/grpc"
 
 	attestabci "github.com/threatattest/chain/x/attestation/abci"
 	attestgenesis "github.com/threatattest/chain/x/attestation/genesis"
@@ -113,7 +112,7 @@ func (am AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 // RegisterServices registers gRPC handlers (MsgServer + QueryServer).
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	pb.RegisterMsgServer(cfg.MsgServer(), &wireMsgServer{inner: am.msgServer})
-	registerQueryRoutes(cfg.QueryServer(), am.qServer)
+	pb.RegisterQueryServer(cfg.QueryServer(), &wireQueryServer{inner: am.qServer})
 }
 
 // InitGenesis initialises module state from genesis JSON.
@@ -155,54 +154,3 @@ func (am AppModule) IsOnePerModuleType() {}
 
 // IsAppModule implements appmodule.AppModule.
 func (am AppModule) IsAppModule() {}
-
-// ============================================================
-// gRPC route registration helpers
-// ============================================================
-
-// grpcMethodHandler matches grpc's unexported methodHandler type (v1.64.1 has
-// no exported grpc.MethodHandler). As a type alias it stays assignable to the
-// grpc.MethodDesc.Handler field.
-type grpcMethodHandler = func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error)
-
-// newUnaryHandler adapts a typed handler method into a grpc method handler.
-func newUnaryHandler[Srv, Req, Res any](fn func(*Srv, context.Context, *Req) (*Res, error)) grpcMethodHandler {
-	return func(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-		in := new(Req)
-		if err := dec(in); err != nil {
-			return nil, err
-		}
-		// NOTE: during service registration the SDK invokes the handler with a
-		// nil srv to extract the request type URL, so cast srv lazily (inside the
-		// branches that only run for real requests).
-		if interceptor == nil {
-			return fn(srv.(*Srv), ctx, in)
-		}
-		info := &grpc.UnaryServerInfo{Server: srv}
-		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-			return fn(srv.(*Srv), ctx, req.(*Req))
-		}
-		return interceptor(ctx, in, info, handler)
-	}
-}
-
-var _Query_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "threatattest.attestation.Query",
-	HandlerType: (*interface{})(nil),
-	Methods: []grpc.MethodDesc{
-		{MethodName: "IsMalicious", Handler: newUnaryHandler((*attestquery.QueryServer).IsMalicious)},
-		{MethodName: "IsMaliciousURL", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousURL)},
-		{MethodName: "IsMaliciousIPv4", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousIPv4)},
-		{MethodName: "IsMaliciousHolloman", Handler: newUnaryHandler((*attestquery.QueryServer).IsMaliciousHolloman)},
-		{MethodName: "GetAttestation", Handler: newUnaryHandler((*attestquery.QueryServer).GetAttestation)},
-		{MethodName: "ListArtifactAttestations", Handler: newUnaryHandler((*attestquery.QueryServer).ListArtifactAttestations)},
-		{MethodName: "ListAttesterAttestations", Handler: newUnaryHandler((*attestquery.QueryServer).ListAttesterAttestations)},
-		{MethodName: "GetDispute", Handler: newUnaryHandler((*attestquery.QueryServer).GetDispute)},
-		{MethodName: "IsBlacklisted", Handler: newUnaryHandler((*attestquery.QueryServer).IsBlacklisted)},
-		{MethodName: "Params", Handler: newUnaryHandler((*attestquery.QueryServer).Params)},
-	},
-}
-
-func registerQueryRoutes(srv grpc.ServiceRegistrar, qs *attestquery.QueryServer) {
-	srv.RegisterService(&_Query_serviceDesc, qs)
-}

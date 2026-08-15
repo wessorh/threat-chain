@@ -904,8 +904,15 @@ func attestationQueryCmds() *cobra.Command {
 	}
 	cmd.AddCommand(
 		isMaliciousCmd(),
+		isMaliciousURLCmd(),
+		isMaliciousIPv4Cmd(),
+		isMaliciousHollomanCmd(),
 		getAttestationCmd(),
 		listByArtifactCmd(),
+		listByAttesterCmd(),
+		getDisputeCmd(),
+		isBlacklistedCmd(),
+		paramsCmd(),
 	)
 	return cmd
 }
@@ -938,10 +945,12 @@ Examples:
 			if len(sha256val) != 64 {
 				return fmt.Errorf("--sha256 must be 64 hex characters, got %d", len(sha256val))
 			}
-			_ = clientCtx
-			cmd.Printf("Querying is-malicious for SHA-256: %s\n", sha256val)
-			cmd.Println("(Connect to a running node with --node tcp://host:26657 for live results)")
-			return nil
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.IsMalicious(cmd.Context(), &pb.QueryIsMaliciousRequest{ArtifactSha256: sha256val})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
 		},
 	}
 	cmd.Flags().String("sha256", "", "Artifact SHA-256 hex string (64 characters, required)")
@@ -964,10 +973,12 @@ Example:
 			if err != nil {
 				return err
 			}
-			_ = clientCtx
-			cmd.Printf("Querying attestation ID: %s\n", args[0])
-			cmd.Println("(Connect to a running node with --node tcp://host:26657 for live results)")
-			return nil
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.GetAttestation(cmd.Context(), &pb.QueryGetAttestationRequest{AttestationId: args[0]})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
 		},
 	}
 	flags.AddQueryFlagsToCmd(cmd)
@@ -987,16 +998,204 @@ Example:
     --sha256 0fd5115915d3d3a05ba5efc2fbeae0fc8dcd26b04947050a986020ecea43de45`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
 			sha256val, _ := cmd.Flags().GetString("sha256")
 			if sha256val == "" {
 				return errors.New("--sha256 is required")
 			}
-			cmd.Printf("Listing attestations for SHA-256: %s\n", sha256val)
-			cmd.Println("(Connect to a running node with --node tcp://host:26657 for live results)")
-			return nil
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.ListArtifactAttestations(cmd.Context(), &pb.QueryListArtifactAttestationsRequest{ArtifactSha256: sha256val})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
 		},
 	}
 	cmd.Flags().String("sha256", "", "Artifact SHA-256 hex string (64 characters, required)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func isMaliciousURLCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "is-malicious-url",
+		Short: "Check if a raw URL is marked malicious on-chain",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			url, _ := cmd.Flags().GetString("url")
+			if url == "" {
+				return errors.New("--url is required")
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.IsMaliciousURL(cmd.Context(), &pb.QueryIsMaliciousURLRequest{Url: url})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	cmd.Flags().String("url", "", "Raw URL string (required)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func isMaliciousIPv4Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "is-malicious-ipv4",
+		Short: "Check if a raw IPv4 address is marked malicious on-chain",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			ipv4, _ := cmd.Flags().GetString("ipv4")
+			if ipv4 == "" {
+				return errors.New("--ipv4 is required")
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.IsMaliciousIPv4(cmd.Context(), &pb.QueryIsMaliciousIPv4Request{Ipv4: ipv4})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	cmd.Flags().String("ipv4", "", "Raw IPv4 address string (required)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func isMaliciousHollomanCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "is-malicious-holloman",
+		Short: "Check if a holloman perceptual signature is marked malicious",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			sig, _ := cmd.Flags().GetString("holloman-signature")
+			if sig == "" {
+				return errors.New("--holloman-signature is required")
+			}
+			mask, _ := cmd.Flags().GetInt32("hamming-mask")
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.IsMaliciousHolloman(cmd.Context(), &pb.QueryIsMaliciousHollomanRequest{HollomanSignature: sig, HammingMask: mask})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	cmd.Flags().String("holloman-signature", "", "128-bit holloman fingerprint (32 hex chars, required)")
+	cmd.Flags().Int32("hamming-mask", 0, "Hamming tolerance radius (0-128)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func listByAttesterCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list-by-attester",
+		Short: "List all attestations published by an attester address",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			attester, _ := cmd.Flags().GetString("attester")
+			if attester == "" {
+				return errors.New("--attester is required")
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.ListAttesterAttestations(cmd.Context(), &pb.QueryListAttesterAttestationsRequest{Attester: attester})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	cmd.Flags().String("attester", "", "Attester bech32 address (required)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func getDisputeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get-dispute [dispute_id]",
+		Short: "Fetch a dispute record by its ID",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.GetDispute(cmd.Context(), &pb.QueryGetDisputeRequest{DisputeId: args[0]})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func isBlacklistedCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "is-blacklisted",
+		Short: "Check if an attester is blacklisted",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			attester, _ := cmd.Flags().GetString("attester")
+			if attester == "" {
+				return errors.New("--attester is required")
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.IsBlacklisted(cmd.Context(), &pb.QueryIsBlacklistedRequest{Attester: attester})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	cmd.Flags().String("attester", "", "Attester bech32 address (required)")
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func paramsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "params",
+		Short: "Fetch the x/attestation module parameters",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			queryClient := pb.NewQueryClient(clientCtx)
+			res, err := queryClient.Params(cmd.Context(), &pb.QueryParamsRequest{})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
 	flags.AddQueryFlagsToCmd(cmd)
 	return cmd
 }
@@ -1238,13 +1437,15 @@ Example:
     --fees 250utatst`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _ := cmd.Flags().GetString("from")
-			if from == "" {
-				return errors.New("--from is required")
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
 			}
-			cmd.Printf("Endorsing attestation %s from %s\n", args[0], from)
-			cmd.Println("Note: Full broadcast requires a running node.")
-			return nil
+			msg := &pb.MsgEndorseAttestation{
+				Endorser:      clientCtx.GetFromAddress().String(),
+				AttestationId: args[0],
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
@@ -1266,14 +1467,17 @@ Example:
     --fees 250utatst`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _ := cmd.Flags().GetString("from")
-			reason, _ := cmd.Flags().GetString("reason")
-			if from == "" {
-				return errors.New("--from is required")
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
 			}
-			cmd.Printf("Revoking attestation %s (reason: %s) from %s\n", args[0], reason, from)
-			cmd.Println("Note: Full broadcast requires a running node.")
-			return nil
+			reason, _ := cmd.Flags().GetString("reason")
+			msg := &pb.MsgRevokeAttestation{
+				Attester:      clientCtx.GetFromAddress().String(),
+				AttestationId: args[0],
+				Reason:        reason,
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
 	cmd.Flags().String("reason", "", "Human-readable revocation reason")
@@ -1304,25 +1508,27 @@ Example:
     --fees 1000utatst`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, _ := cmd.Flags().GetString("from")
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
 			ground, _ := cmd.Flags().GetString("ground")
 			evidence, _ := cmd.Flags().GetString("evidence")
-			if from == "" {
-				return errors.New("--from is required")
+			validGrounds := map[string]int32{
+				"FALSE_POSITIVE": 1, "INCORRECT_SEVERITY": 2,
+				"FABRICATED_EVIDENCE": 3, "STALE_REUSE": 4, "SYBIL_ATTACK": 5,
 			}
-			validGrounds := map[string]bool{
-				"FALSE_POSITIVE": true, "INCORRECT_SEVERITY": true,
-				"FABRICATED_EVIDENCE": true, "STALE_REUSE": true, "SYBIL_ATTACK": true,
-			}
-			if ground != "" && !validGrounds[ground] {
+			groundInt, ok := validGrounds[ground]
+			if !ok {
 				return fmt.Errorf("invalid --ground %q", ground)
 			}
-			cmd.Printf("Disputing attestation %s\n", args[0])
-			cmd.Printf("  Ground  : %s\n", ground)
-			cmd.Printf("  Evidence: %s\n", evidence)
-			cmd.Printf("  From    : %s\n", from)
-			cmd.Println("Note: Full broadcast requires a running node.")
-			return nil
+			msg := &pb.MsgDisputeAttestation{
+				Disputer:      clientCtx.GetFromAddress().String(),
+				AttestationId: args[0],
+				Ground:        groundInt,
+				Evidence:      evidence,
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
 	cmd.Flags().String("ground", "FALSE_POSITIVE",
