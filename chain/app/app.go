@@ -161,9 +161,10 @@ func NewThreatAttestApp(
 	// constructed), so we must not call SetBech32Prefix* here again.
 	sdk.DefaultBondDenom = BondDenom
 
-	interfaceRegistry := codectypes.NewInterfaceRegistry()
-	cdc := codec.NewProtoCodec(interfaceRegistry)
-	legacyAmino := codec.NewLegacyAmino()
+	encodingConfig := MakeEncodingConfig()
+	interfaceRegistry := encodingConfig.InterfaceRegistry
+	cdc := encodingConfig.Codec
+	legacyAmino := encodingConfig.Amino
 
 	bApp := baseapp.NewBaseApp(AppName, logger, db, nil, baseAppOptions...)
 	bApp.SetCommitMultiStoreTracer(traceStore)
@@ -308,6 +309,7 @@ func NewThreatAttestApp(
 		govAuthority,
 		runtime.ProvideEventService(),
 	)
+	bApp.SetParamStore(app.ConsensusKeeper.ParamsStore)
 
 	app.GovKeeper = govkeeper.NewKeeper(
 		cdc,
@@ -425,12 +427,6 @@ func NewThreatAttestApp(
 	app.mm.SetOrderInitGenesis(genesisOrder...)
 	app.mm.SetOrderExportGenesis(genesisOrder...)
 
-	// Register message/query interfaces with the codec so transactions can be
-	// decoded and routed via the MsgServiceRouter / GRPCQueryRouter.
-	bm := module.NewBasicManagerFromManager(app.mm, nil)
-	bm.RegisterLegacyAminoCodec(legacyAmino)
-	bm.RegisterInterfaces(interfaceRegistry)
-
 	app.configurator = module.NewConfigurator(cdc, app.MsgServiceRouter(), app.GRPCQueryRouter())
 	if err := app.mm.RegisterServices(app.configurator); err != nil {
 		panic(err)
@@ -438,16 +434,12 @@ func NewThreatAttestApp(
 
 	// ── AnteHandler ─────────────────────────────────────────────────────────────
 
-	// TxConfig provides the sign mode handler required for ante signature
-	// verification.
-	txConfig := authtx.NewTxConfig(cdc, authtx.DefaultSignModes)
-
 	anteHandler, err := tatante.NewAnteHandler(tatante.HandlerOptions{
 		HandlerOptions: authante.HandlerOptions{
 			AccountKeeper:   app.AccountKeeper,
 			BankKeeper:      app.BankKeeper,
 			FeegrantKeeper:  app.FeeGrantKeeper,
-			SignModeHandler: txConfig.SignModeHandler(),
+			SignModeHandler: encodingConfig.TxConfig.SignModeHandler(),
 		},
 		AttestKeeper: app.AttestKeeper,
 	})

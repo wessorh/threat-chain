@@ -33,9 +33,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
-	"github.com/cosmos/cosmos-sdk/codec"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
-	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/server"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -62,10 +60,13 @@ func NewRootCmd() *cobra.Command {
 	cfg.SetBech32PrefixForConsensusNode(tatapp.Bech32Prefix+"valcons", tatapp.Bech32Prefix+"valconspub")
 	cfg.Seal()
 
+	encodingConfig := tatapp.MakeEncodingConfig()
+
 	initClientCtx := client.Context{}.
-		WithCodec(codec.NewProtoCodec(codectypes.NewInterfaceRegistry())).
-		WithInterfaceRegistry(codectypes.NewInterfaceRegistry()).
-		WithLegacyAmino(codec.NewLegacyAmino()).
+		WithCodec(encodingConfig.Codec).
+		WithInterfaceRegistry(encodingConfig.InterfaceRegistry).
+		WithLegacyAmino(encodingConfig.Amino).
+		WithTxConfig(encodingConfig.TxConfig).
 		WithInput(os.Stdin).
 		WithAccountRetriever(nil).
 		WithHomeDir(DefaultNodeHome).
@@ -1348,7 +1349,7 @@ func addGenesisAccountCmd(defaultNodeHome, bech32Prefix string) *cobra.Command {
 // ============================================================
 
 func newBasicManager() module.BasicManager {
-	return module.NewBasicManager()
+	return tatapp.ModuleBasics
 }
 
 func initAppConfig() (string, interface{}) {
