@@ -3,10 +3,10 @@
 package app
 
 import (
-	evidencemodule "cosmossdk.io/x/evidence"
-	feegrantmodule "cosmossdk.io/x/feegrant/module"
-	"cosmossdk.io/x/tx/signing"
-	upgrademodule "cosmossdk.io/x/upgrade"
+	evidencemodule "github.com/cosmos/cosmos-sdk/x/evidence"
+	feegrantmodule "github.com/cosmos/cosmos-sdk/x/feegrant/module"
+	"github.com/cosmos/cosmos-sdk/x/tx/signing"
+	upgrademodule "github.com/cosmos/cosmos-sdk/x/upgrade"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -20,10 +20,8 @@ import (
 	authzmodule "github.com/cosmos/cosmos-sdk/x/authz/module"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/cosmos/cosmos-sdk/x/consensus"
-	"github.com/cosmos/cosmos-sdk/x/crisis"
 	"github.com/cosmos/cosmos-sdk/x/distribution"
 	"github.com/cosmos/cosmos-sdk/x/gov"
-	"github.com/cosmos/cosmos-sdk/x/params"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/gogoproto/proto"
@@ -53,12 +51,10 @@ var ModuleBasics = module.NewBasicManager(
 	distribution.AppModuleBasic{},
 	slashing.AppModuleBasic{},
 	gov.AppModuleBasic{},
-	crisis.AppModuleBasic{},
 	upgrademodule.AppModuleBasic{},
 	evidencemodule.AppModuleBasic{},
 	feegrantmodule.AppModuleBasic{},
 	authzmodule.AppModuleBasic{},
-	params.AppModuleBasic{},
 	consensus.AppModuleBasic{},
 	tatmint.AppModuleBasic{},
 	reputation.AppModuleBasic{},

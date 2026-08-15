@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"cosmossdk.io/core/store"
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -124,7 +124,7 @@ func (k Keeper) IterateJobs(ctx sdk.Context, cb func(types.VerificationJob) bool
 			break
 		}
 	}
-	return iter.Error()
+	return nil
 }
 
 // ============================================================
@@ -205,7 +205,7 @@ func (k Keeper) DequeuePendingJobs(ctx sdk.Context, maxCount int) ([]types.Verif
 			jobs = append(jobs, job)
 		}
 	}
-	return jobs, iter.Error()
+	return jobs, nil
 }
 
 // RemoveFromQueue removes a job from the pending queue.

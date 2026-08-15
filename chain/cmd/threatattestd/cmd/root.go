@@ -17,11 +17,11 @@ import (
 
 	cmtcfg "github.com/cometbft/cometbft/config"
 
-	"cosmossdk.io/log"
-	"cosmossdk.io/store/snapshots"
-	snapshottypes "cosmossdk.io/store/snapshots/types"
-	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/log/v2"
 	confixcmd "cosmossdk.io/tools/confix/cmd"
+	"github.com/cosmos/cosmos-sdk/store/v2/snapshots"
+	snapshottypes "github.com/cosmos/cosmos-sdk/store/v2/snapshots/types"
+	storetypes "github.com/cosmos/cosmos-sdk/store/v2/types"
 
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -33,20 +33,24 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
+	"github.com/cosmos/cosmos-sdk/client/tx"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/cosmos/cosmos-sdk/server"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/spf13/cobra"
 
 	tatapp "github.com/threatattest/chain/app"
+	attesttypes "github.com/threatattest/chain/x/attestation/types"
+	pb "github.com/threatattest/chain/x/attestation/types/pb"
 )
 
 // DefaultNodeHome is the default home directory for the node.
@@ -68,7 +72,7 @@ func NewRootCmd() *cobra.Command {
 		WithLegacyAmino(encodingConfig.Amino).
 		WithTxConfig(encodingConfig.TxConfig).
 		WithInput(os.Stdin).
-		WithAccountRetriever(nil).
+		WithAccountRetriever(authtypes.AccountRetriever{}).
 		WithHomeDir(DefaultNodeHome).
 		WithViper("TATST")
 
@@ -116,7 +120,6 @@ func initRootCmd(rootCmd *cobra.Command, clientCtx client.Context) {
 			genutiltypes.DefaultMessageValidator,
 			valAddrCodec,
 		),
-		genutilcli.MigrateGenesisCmd(genutiltypes.MigrationMap{}),
 		genutilcli.GenTxCmd(
 			newBasicManager(),
 			clientCtx.TxConfig,
@@ -146,9 +149,7 @@ func initRootCmd(rootCmd *cobra.Command, clientCtx client.Context) {
 	)
 }
 
-func addModuleInitFlags(startCmd *cobra.Command) {
-	crisis.AddModuleInitFlags(startCmd)
-}
+func addModuleInitFlags(_ *cobra.Command) {}
 
 // ============================================================
 // attest-file — the key demo command
@@ -1061,6 +1062,11 @@ Examples:
     --chain-id threatattest-1 \
     --fees 500utatst`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+
 			artifactType, _ := cmd.Flags().GetString("artifact-type")
 			artifactSHA256, _ := cmd.Flags().GetString("artifact-sha256")
 			rawValue, _ := cmd.Flags().GetString("raw-value")
@@ -1072,18 +1078,20 @@ Examples:
 			categories, _ := cmd.Flags().GetStringSlice("category")
 			attesterDomain, _ := cmd.Flags().GetString("attester-domain")
 			attesterSelector, _ := cmd.Flags().GetString("attester-selector")
-			from, _ := cmd.Flags().GetString("from")
 
 			// Validation
 			if artifactSHA256 == "" && rawValue == "" {
 				return errors.New("either --artifact-sha256 or --raw-value is required")
 			}
-			if from == "" {
-				return errors.New("--from is required")
-			}
-			validTypes := map[string]bool{"FILE": true, "URL": true, "IPV4": true, "DOMAIN": true}
-			if !validTypes[artifactType] {
+			validTypes := map[string]int32{"FILE": 1, "URL": 2, "IPV4": 3, "DOMAIN": 4}
+			artifactTypeInt, ok := validTypes[artifactType]
+			if !ok {
 				return fmt.Errorf("invalid --artifact-type %q: must be FILE, URL, IPV4, or DOMAIN", artifactType)
+			}
+			validSeverities := map[string]int32{"LOW": 2, "MEDIUM": 3, "HIGH": 4, "CRITICAL": 5}
+			severityInt, ok := validSeverities[severity]
+			if !ok {
+				return fmt.Errorf("invalid --severity %q: must be LOW, MEDIUM, HIGH, or CRITICAL", severity)
 			}
 			if confidence < 0 || confidence > 100 {
 				return fmt.Errorf("--confidence must be 0-100, got %d", confidence)
@@ -1102,50 +1110,38 @@ Examples:
 
 			// If raw-value provided but no sha256, compute it based on artifact type
 			if artifactSHA256 == "" && rawValue != "" {
-				switch artifactType {
-				case "DOMAIN":
-					// Use lowercase domain (strip www.) as the canonical value
-					norm := rawValue
-					h := sha256.Sum256([]byte(norm))
-					artifactSHA256 = hex.EncodeToString(h[:])
-					cmd.Printf("Computed artifact_sha256 from domain --raw-value: %s\n", artifactSHA256)
-				default:
-					h := sha256.Sum256([]byte(rawValue))
-					artifactSHA256 = hex.EncodeToString(h[:])
-					cmd.Printf("Computed artifact_sha256 from --raw-value: %s\n", artifactSHA256)
-				}
+				h := sha256.Sum256([]byte(rawValue))
+				artifactSHA256 = hex.EncodeToString(h[:])
+				cmd.Printf("Computed artifact_sha256 from --raw-value: %s\n", artifactSHA256)
 			}
 
-			cmd.Println()
-			cmd.Println("MsgPublishAttestation ready to broadcast:")
-			cmd.Printf("  artifact_type   : %s\n", artifactType)
-			cmd.Printf("  artifact_sha256 : %s\n", artifactSHA256)
-			if rawValue != "" {
-				cmd.Printf("  raw_value       : %s\n", rawValue)
+			// Sign the attestation payload with the attester's key. This binds the
+			// attester's identity to the specific threat data and prevents a tx relay
+			// from substituting a different artifact.
+			attester := clientCtx.GetFromAddress().String()
+			attesterSig, err := signAttesterSig(clientCtx, artifactSHA256, attester, ttl)
+			if err != nil {
+				return err
 			}
-			cmd.Printf("  severity        : %s\n", severity)
-			cmd.Printf("  confidence      : %d\n", confidence)
-			cmd.Printf("  ttl_seconds     : %d\n", ttl)
-			if description != "" {
-				cmd.Printf("  description     : %s\n", description)
+
+			msg := &pb.MsgPublishAttestation{
+				Attester:         attester,
+				ArtifactType:     artifactTypeInt,
+				ArtifactSha256:   artifactSHA256,
+				RawValue:         rawValue,
+				Severity:         severityInt,
+				TtlSeconds:       ttl,
+				Confidence:       uint32(confidence),
+				Description:      description,
+				Tags:             tags,
+				ThreatCategories: categories,
+				AttesterSig:      attesterSig,
+				AttesterDomain:   attesterDomain,
+				AttesterSelector: attesterSelector,
+				PuaInfo:          buildPUAInfo(cmd),
 			}
-			if len(tags) > 0 {
-				cmd.Printf("  tags            : %v\n", tags)
-			}
-			if len(categories) > 0 {
-				cmd.Printf("  threat_category : %v\n", categories)
-			}
-			cmd.Printf("  from            : %s\n", from)
-			if attesterDomain != "" {
-				cmd.Printf("  attester_domain  : %s\n", attesterDomain)
-				cmd.Printf("  attester_selector: %s\n", attesterSelector)
-			}
-			cmd.Println()
-			cmd.Println("Note: Full on-chain broadcast requires a running node and proto-generated")
-			cmd.Println("      codec registration.  Use --generate-only with REST/gRPC for production.")
-			_ = attesterDomain
-			_ = attesterSelector
-			return nil
+
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
 
@@ -1184,6 +1180,43 @@ Examples:
 		"(Optional) DNS selector for the attester's active TAT key record (e.g. tat2025a)")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
+}
+
+// buildPUAInfo assembles PUA metadata from the (optional) PUA flags. Returns
+// nil when no PUA flags are supplied.
+func buildPUAInfo(cmd *cobra.Command) *pb.PUAMetadata {
+	softwareName, _ := cmd.Flags().GetString("pua-software-name")
+	vendor, _ := cmd.Flags().GetString("pua-vendor")
+	version, _ := cmd.Flags().GetString("pua-version")
+	notes, _ := cmd.Flags().GetString("pua-behavior-notes")
+	names, _ := cmd.Flags().GetStringSlice("pua-detection-names")
+
+	if softwareName == "" && vendor == "" && version == "" && notes == "" && len(names) == 0 {
+		return nil
+	}
+	return &pb.PUAMetadata{
+		SoftwareName:   softwareName,
+		Vendor:         vendor,
+		Version:        version,
+		BehaviorNotes:  notes,
+		DetectionNames: names,
+	}
+}
+
+// signAttesterSig signs the canonical attestation payload with the attester's
+// key, producing the 128-hex-char secp256k1 signature stored in the
+// MsgPublishAttestation.attester_sig field.
+func signAttesterSig(clientCtx client.Context, artifactSHA256, attester string, ttl int64) (string, error) {
+	from := clientCtx.FromName
+	if from == "" {
+		return "", errors.New("--from is required")
+	}
+	payload := attesttypes.BuildAttesterSigPayload(artifactSHA256, attester, ttl)
+	sig, _, err := clientCtx.Keyring.Sign(from, payload, signing.SignMode_SIGN_MODE_DIRECT)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign attestation payload: %w", err)
+	}
+	return hex.EncodeToString(sig), nil
 }
 
 func endorseAttestationCmd() *cobra.Command {
@@ -1307,24 +1340,22 @@ Example:
 func newApp(
 	logger log.Logger,
 	db dbm.DB,
-	traceStore io.Writer,
 	appOpts servertypes.AppOptions,
 ) servertypes.Application {
 	baseappOptions := server.DefaultBaseappOptions(appOpts)
-	return tatapp.NewThreatAttestApp(logger, db, traceStore, true, appOpts, baseappOptions...)
+	return tatapp.NewThreatAttestApp(logger, db, nil, true, appOpts, baseappOptions...)
 }
 
 func appExport(
 	logger log.Logger,
 	db dbm.DB,
-	traceStore io.Writer,
 	height int64,
 	forZeroHeight bool,
 	jailAllowedAddrs []string,
 	appOpts servertypes.AppOptions,
 	modulesToExport []string,
 ) (servertypes.ExportedApp, error) {
-	app := tatapp.NewThreatAttestApp(logger, db, traceStore, height == -1, appOpts)
+	app := tatapp.NewThreatAttestApp(logger, db, nil, height == -1, appOpts)
 	if height != -1 {
 		if err := app.LoadVersion(height); err != nil {
 			return servertypes.ExportedApp{}, err

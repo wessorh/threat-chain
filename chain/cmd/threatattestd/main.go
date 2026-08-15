@@ -8,7 +8,7 @@ package main
 import (
 	"os"
 
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 
 	"github.com/threatattest/chain/app"

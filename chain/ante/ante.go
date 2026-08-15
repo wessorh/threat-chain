@@ -11,8 +11,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 
 	attestkeeper "github.com/threatattest/chain/x/attestation/keeper"
-	attestmsgs "github.com/threatattest/chain/x/attestation/msgs"
 	attesttypes "github.com/threatattest/chain/x/attestation/types"
+	pb "github.com/threatattest/chain/x/attestation/types/pb"
 )
 
 // ============================================================
@@ -38,7 +38,7 @@ func (d AttesterEligibilityDecorator) AnteHandle(
 	next sdk.AnteHandler,
 ) (sdk.Context, error) {
 	for _, msg := range tx.GetMsgs() {
-		pub, ok := msg.(*attestmsgs.MsgPublishAttestation)
+		pub, ok := msg.(*pb.MsgPublishAttestation)
 		if !ok {
 			continue
 		}
@@ -98,7 +98,7 @@ func (d AttesterRateLimitDecorator) AnteHandle(
 	var publishCount int
 	var attester string
 	for _, msg := range tx.GetMsgs() {
-		pub, ok := msg.(*attestmsgs.MsgPublishAttestation)
+		pub, ok := msg.(*pb.MsgPublishAttestation)
 		if !ok {
 			continue
 		}
@@ -159,26 +159,26 @@ func (d TimestampToleranceDecorator) AnteHandle(
 	}
 
 	for _, msg := range tx.GetMsgs() {
-		pub, ok := msg.(*attestmsgs.MsgPublishAttestation)
+		pub, ok := msg.(*pb.MsgPublishAttestation)
 		if !ok {
 			continue
 		}
 
 		// TTL range check
-		if pub.TTLSeconds < params.MinTTLSeconds || pub.TTLSeconds > params.MaxTTLSeconds {
+		if pub.TtlSeconds < params.MinTTLSeconds || pub.TtlSeconds > params.MaxTTLSeconds {
 			return ctx, errors.Wrapf(attesttypes.ErrTTLOutOfRange,
-				"ttl=%d min=%d max=%d", pub.TTLSeconds, params.MinTTLSeconds, params.MaxTTLSeconds)
+				"ttl=%d min=%d max=%d", pub.TtlSeconds, params.MinTTLSeconds, params.MaxTTLSeconds)
 		}
 
 		// IPv4 TTL cap
-		if pub.ArtifactType == attesttypes.ArtifactType_IPV4 &&
-			pub.TTLSeconds > params.MaxTTLIPv4Seconds {
+		if attesttypes.ArtifactType(pub.ArtifactType) == attesttypes.ArtifactType_IPV4 &&
+			pub.TtlSeconds > params.MaxTTLIPv4Seconds {
 			return ctx, errors.Wrapf(attesttypes.ErrTTLOutOfRange,
-				"ipv4 ttl=%d max=%d", pub.TTLSeconds, params.MaxTTLIPv4Seconds)
+				"ipv4 ttl=%d max=%d", pub.TtlSeconds, params.MaxTTLIPv4Seconds)
 		}
 
 		// IPv4 minimum confidence
-		if pub.ArtifactType == attesttypes.ArtifactType_IPV4 &&
+		if attesttypes.ArtifactType(pub.ArtifactType) == attesttypes.ArtifactType_IPV4 &&
 			pub.Confidence < params.IPv4MinConfidence {
 			return ctx, errors.Wrapf(attesttypes.ErrInvalidConfidence,
 				"ipv4 confidence=%d min=%d", pub.Confidence, params.IPv4MinConfidence)

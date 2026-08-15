@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"cosmossdk.io/core/store"
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -124,7 +124,7 @@ func (k Keeper) IterateReputations(ctx sdk.Context, cb func(types.ReputationReco
 			break
 		}
 	}
-	return iter.Error()
+	return nil
 }
 
 // ============================================================

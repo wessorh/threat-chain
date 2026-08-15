@@ -1,13 +1,15 @@
 syntax = "proto3";
 package threatattest.attestation;
 
+import "cosmos/msg/v1/msg.proto";
+
 option go_package = "github.com/threatattest/chain/x/attestation/types/pb";
 
-// Msg service for x/attestation. The concrete message types are handwritten
-// (JSON-tagged) Go structs in the `msgs` package; these proto messages exist
-// solely so the gRPC service descriptor (and thus the MsgServiceRouter method
-// descriptors) can be registered. Fields are intentionally omitted.
+// Msg service for x/attestation. These are the real wire messages used by the
+// tx codec; the keeper converts them into the store model (x/attestation/types).
 service Msg {
+  option (cosmos.msg.v1.service) = true;
+
   rpc PublishAttestation(MsgPublishAttestation) returns (MsgPublishAttestationResponse);
   rpc EndorseAttestation(MsgEndorseAttestation) returns (MsgEndorseAttestationResponse);
   rpc RevokeAttestation(MsgRevokeAttestation) returns (MsgRevokeAttestationResponse);
@@ -18,19 +20,160 @@ service Msg {
   rpc Unsubscribe(MsgUnsubscribe) returns (MsgUnsubscribeResponse);
 }
 
-message MsgPublishAttestation {}
-message MsgPublishAttestationResponse {}
-message MsgEndorseAttestation {}
-message MsgEndorseAttestationResponse {}
-message MsgRevokeAttestation {}
+// DetectionRuleRef anchors a detection rule stored on IPFS.
+message DetectionRuleRef {
+  string rule_id          = 1;
+  int32  rule_type        = 2;
+  string rule_name        = 3;
+  string cid              = 4;
+  string content_sha256   = 5;
+  string rule_version     = 6;
+  string rule_author      = 7;
+  int32  applies_to       = 8;
+  string min_yara_version = 9;
+  bool   verified         = 10;
+}
+
+// PUAMetadata carries software-specific information for TATST:PUA attestations.
+message PUAMetadata {
+  string software_name          = 1;
+  string vendor                 = 2;
+  string version                = 3;
+  string installer_sha256       = 4;
+  uint32 behaviors              = 5;
+  string behavior_notes         = 6;
+  repeated string detection_names = 7;
+}
+
+// Params holds x/attestation module parameters (wire form).
+message Params {
+  string min_attester_delegation     = 1;
+  int64  min_ttl_seconds             = 2;
+  int64  max_ttl_seconds             = 3;
+  int64  max_ttl_ipv4_seconds        = 4;
+  uint32 max_detection_rules         = 5;
+  uint32 max_attestations_per_epoch  = 6;
+  string dispute_bond_amount         = 7;
+  uint32 ipv4_min_confidence         = 8;
+  int64  timestamp_tolerance_seconds = 9;
+  uint32 min_reputation_to_attest    = 10;
+  uint32 min_reputation_to_endorse   = 11;
+  uint32 min_reputation_to_dispute   = 12;
+}
+
+// MsgPublishAttestation submits a new threat attestation to the chain.
+message MsgPublishAttestation {
+  option (cosmos.msg.v1.signer) = "attester";
+
+  string attester              = 1;
+  int32  artifact_type         = 2;
+  string artifact_sha256       = 3;
+  string holloman_signature    = 4;
+  int32  hamming_mask          = 5;
+  string raw_value             = 6;
+  int32  severity              = 7;
+  int32  tlp                   = 8;
+  int64  ttl_seconds           = 9;
+  uint32 confidence            = 10;
+  string description           = 11;
+  repeated string tags         = 12;
+  repeated string threat_categories = 13;
+  repeated DetectionRuleRef detection_rules = 14;
+  repeated string related_to   = 15;
+  repeated string mitre_attack_ids = 16;
+  string attester_sig          = 17;
+  PUAMetadata pua_info         = 18;
+  string attester_domain       = 19;
+  string attester_selector     = 20;
+}
+
+message MsgPublishAttestationResponse {
+  string attestation_id = 1;
+  int64  expires_at     = 2;
+}
+
+// MsgEndorseAttestation adds an endorsement to an existing attestation.
+message MsgEndorseAttestation {
+  option (cosmos.msg.v1.signer) = "endorser";
+
+  string endorser       = 1;
+  string attestation_id = 2;
+  string comment        = 3;
+}
+
+message MsgEndorseAttestationResponse {
+  uint32 endorsement_count = 1;
+}
+
+// MsgRevokeAttestation revokes an attestation published by the sender.
+message MsgRevokeAttestation {
+  option (cosmos.msg.v1.signer) = "attester";
+
+  string attester       = 1;
+  string attestation_id = 2;
+  string reason         = 3;
+}
+
 message MsgRevokeAttestationResponse {}
-message MsgDisputeAttestation {}
-message MsgDisputeAttestationResponse {}
-message MsgUpdateParams {}
+
+// MsgDisputeAttestation files a dispute against an existing attestation.
+message MsgDisputeAttestation {
+  option (cosmos.msg.v1.signer) = "disputer";
+
+  string disputer       = 1;
+  string attestation_id = 2;
+  int32  ground         = 3;
+  string evidence       = 4;
+  string evidence_cid   = 5;
+}
+
+message MsgDisputeAttestationResponse {
+  string dispute_id = 1;
+}
+
+// MsgUpdateParams updates the module parameters via governance.
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+
+  string authority = 1;
+  Params params    = 2;
+}
+
 message MsgUpdateParamsResponse {}
-message MsgClaimReward {}
-message MsgClaimRewardResponse {}
-message MsgSubscribe {}
-message MsgSubscribeResponse {}
-message MsgUnsubscribe {}
-message MsgUnsubscribeResponse {}
+
+// MsgClaimReward allows an attester to claim their share of the incentive pool.
+message MsgClaimReward {
+  option (cosmos.msg.v1.signer) = "attester";
+
+  string attester = 1;
+}
+
+message MsgClaimRewardResponse {
+  string claimed_amount = 1;
+  string pool_remaining = 2;
+}
+
+// MsgSubscribe locks tokens to activate a paid API tier.
+message MsgSubscribe {
+  option (cosmos.msg.v1.signer) = "subscriber";
+
+  string subscriber = 1;
+  int32  tier       = 2; // 0=FREE, 1=PRO, 2=ENTERPRISE
+}
+
+message MsgSubscribeResponse {
+  string tier         = 1;
+  int64  expires_at   = 2;
+  string stake_locked = 3;
+}
+
+// MsgUnsubscribe unlocks tokens and returns to the FREE tier.
+message MsgUnsubscribe {
+  option (cosmos.msg.v1.signer) = "subscriber";
+
+  string subscriber = 1;
+}
+
+message MsgUnsubscribeResponse {
+  string unlocked_amount = 1;
+}

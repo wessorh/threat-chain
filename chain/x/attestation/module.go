@@ -18,10 +18,9 @@ import (
 	attestabci "github.com/threatattest/chain/x/attestation/abci"
 	attestgenesis "github.com/threatattest/chain/x/attestation/genesis"
 	"github.com/threatattest/chain/x/attestation/keeper"
-	attestmsgs "github.com/threatattest/chain/x/attestation/msgs"
 	attestquery "github.com/threatattest/chain/x/attestation/query"
 	"github.com/threatattest/chain/x/attestation/types"
-	_ "github.com/threatattest/chain/x/attestation/types/pb"
+	pb "github.com/threatattest/chain/x/attestation/types/pb"
 )
 
 // Ensure AppModule implements all required interfaces.
@@ -53,15 +52,16 @@ func (AppModuleBasic) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
 // they can be decoded from tx Any values and routed by the MsgServiceRouter.
 func (AppModuleBasic) RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 	registry.RegisterImplementations((*sdk.Msg)(nil),
-		&attestmsgs.MsgPublishAttestation{},
-		&attestmsgs.MsgEndorseAttestation{},
-		&attestmsgs.MsgRevokeAttestation{},
-		&attestmsgs.MsgDisputeAttestation{},
-		&attestmsgs.MsgUpdateParams{},
-		&attestmsgs.MsgClaimReward{},
-		&attestmsgs.MsgSubscribe{},
-		&attestmsgs.MsgUnsubscribe{},
+		&pb.MsgPublishAttestation{},
+		&pb.MsgEndorseAttestation{},
+		&pb.MsgRevokeAttestation{},
+		&pb.MsgDisputeAttestation{},
+		&pb.MsgUpdateParams{},
+		&pb.MsgClaimReward{},
+		&pb.MsgSubscribe{},
+		&pb.MsgUnsubscribe{},
 	)
+	pb.RegisterMsgServiceDesc(registry)
 }
 
 // DefaultGenesis returns the default genesis state JSON.
@@ -112,7 +112,7 @@ func (am AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 
 // RegisterServices registers gRPC handlers (MsgServer + QueryServer).
 func (am AppModule) RegisterServices(cfg module.Configurator) {
-	registerMsgRoutes(cfg.MsgServer(), am.msgServer)
+	pb.RegisterMsgServer(cfg.MsgServer(), &wireMsgServer{inner: am.msgServer})
 	registerQueryRoutes(cfg.QueryServer(), am.qServer)
 }
 
@@ -186,21 +186,6 @@ func newUnaryHandler[Srv, Req, Res any](fn func(*Srv, context.Context, *Req) (*R
 	}
 }
 
-var _Msg_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "threatattest.attestation.Msg",
-	HandlerType: (*interface{})(nil),
-	Methods: []grpc.MethodDesc{
-		{MethodName: "PublishAttestation", Handler: newUnaryHandler((*keeper.MsgServer).PublishAttestation)},
-		{MethodName: "EndorseAttestation", Handler: newUnaryHandler((*keeper.MsgServer).EndorseAttestation)},
-		{MethodName: "RevokeAttestation", Handler: newUnaryHandler((*keeper.MsgServer).RevokeAttestation)},
-		{MethodName: "DisputeAttestation", Handler: newUnaryHandler((*keeper.MsgServer).DisputeAttestation)},
-		{MethodName: "UpdateParams", Handler: newUnaryHandler((*keeper.MsgServer).UpdateParams)},
-		{MethodName: "ClaimReward", Handler: newUnaryHandler((*keeper.MsgServer).ClaimReward)},
-		{MethodName: "Subscribe", Handler: newUnaryHandler((*keeper.MsgServer).Subscribe)},
-		{MethodName: "Unsubscribe", Handler: newUnaryHandler((*keeper.MsgServer).Unsubscribe)},
-	},
-}
-
 var _Query_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "threatattest.attestation.Query",
 	HandlerType: (*interface{})(nil),
@@ -218,84 +203,6 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 	},
 }
 
-func registerMsgRoutes(srv grpc.ServiceRegistrar, ms *keeper.MsgServer) {
-	srv.RegisterService(&_Msg_serviceDesc, ms)
-}
-
 func registerQueryRoutes(srv grpc.ServiceRegistrar, qs *attestquery.QueryServer) {
 	srv.RegisterService(&_Query_serviceDesc, qs)
-}
-
-// ============================================================
-// Msg handler map for app-level router wiring
-// ============================================================
-
-// MsgHandlers returns the message handlers map for manual router wiring.
-func (am AppModule) MsgHandlers() map[string]func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-	return map[string]func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error){
-		sdk.MsgTypeURL(&attestmsgs.MsgPublishAttestation{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.PublishAttestation(ctx, msg.(*attestmsgs.MsgPublishAttestation))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgEndorseAttestation{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.EndorseAttestation(ctx, msg.(*attestmsgs.MsgEndorseAttestation))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgRevokeAttestation{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.RevokeAttestation(ctx, msg.(*attestmsgs.MsgRevokeAttestation))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgDisputeAttestation{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.DisputeAttestation(ctx, msg.(*attestmsgs.MsgDisputeAttestation))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgUpdateParams{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.UpdateParams(ctx, msg.(*attestmsgs.MsgUpdateParams))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgClaimReward{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.ClaimReward(ctx, msg.(*attestmsgs.MsgClaimReward))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgSubscribe{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.Subscribe(ctx, msg.(*attestmsgs.MsgSubscribe))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-		sdk.MsgTypeURL(&attestmsgs.MsgUnsubscribe{}): func(ctx sdk.Context, msg sdk.Msg) (sdk.Result, error) {
-			resp, err := am.msgServer.Unsubscribe(ctx, msg.(*attestmsgs.MsgUnsubscribe))
-			if err != nil {
-				return sdk.Result{}, err
-			}
-			bz, _ := json.Marshal(resp)
-			return sdk.Result{Data: bz}, nil
-		},
-	}
 }

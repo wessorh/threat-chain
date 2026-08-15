@@ -10,7 +10,7 @@ import (
 
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/errors"
-	"cosmossdk.io/log"
+	"cosmossdk.io/log/v2"
 	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -173,7 +173,7 @@ func (k Keeper) IterateAttestations(ctx sdk.Context, cb func(types.AttestationRe
 			break
 		}
 	}
-	return iter.Error()
+	return nil
 }
 
 // ============================================================
@@ -391,7 +391,7 @@ func (k Keeper) IterateExpiredAttestations(ctx sdk.Context, currentTime int64, c
 			break
 		}
 	}
-	return iter.Error()
+	return nil
 }
 
 // expiryQueueEndKey builds the exclusive upper bound for expiry iteration:
@@ -454,9 +454,6 @@ func (k Keeper) PruneEpochCounts(ctx sdk.Context, epoch uint64) error {
 		k2 := make([]byte, len(iter.Key()))
 		copy(k2, iter.Key())
 		keys = append(keys, k2)
-	}
-	if err := iter.Error(); err != nil {
-		return err
 	}
 
 	for _, key := range keys {
@@ -541,7 +538,7 @@ func (k Keeper) IterateDisputes(ctx sdk.Context, cb func(types.DisputeRecord) bo
 			break
 		}
 	}
-	return iter.Error()
+	return nil
 }
 
 // ============================================================
@@ -604,9 +601,6 @@ func (k Keeper) CountEndorsements(ctx sdk.Context, attestationID string) (uint32
 	var count uint32
 	for ; iter.Valid(); iter.Next() {
 		count++
-	}
-	if err := iter.Error(); err != nil {
-		return 0, err
 	}
 	return count, nil
 }
