@@ -1,0 +1,125 @@
+syntax = "proto3";
+package threatattest.identity;
+
+import "cosmos/msg/v1/msg.proto";
+
+option go_package = "github.com/threatattest/chain/x/identity/types/pb";
+
+// Msg service for x/identity. These are the real wire messages used by the tx
+// codec; the keeper converts them into the handwritten store-facing types
+// (x/identity/types) which carry ValidateBasic and the keeper business logic.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  rpc RegisterIdentity(MsgRegisterIdentity) returns (MsgRegisterIdentityResponse);
+  rpc RotateIdentityKey(MsgRotateIdentityKey) returns (MsgRotateIdentityKeyResponse);
+  rpc RevokeIdentity(MsgRevokeIdentity) returns (MsgRevokeIdentityResponse);
+  rpc RenewIdentity(MsgRenewIdentity) returns (MsgRenewIdentityResponse);
+}
+
+// RRSIGRecord holds one RRSIG resource record (RFC 4034 §3).
+message RRSIGRecord {
+  string type_covered  = 1;
+  int32  algorithm     = 2;
+  int32  labels        = 3;
+  uint32 original_ttl  = 4;
+  int64  expiration    = 5;
+  int64  inception     = 6;
+  int32  key_tag       = 7;
+  string signer_name   = 8;
+  string signature     = 9;
+}
+
+// DNSKEYRecord holds one DNSKEY resource record (RFC 4034 §2).
+message DNSKEYRecord {
+  int32  flags      = 1;
+  int32  protocol   = 2;
+  int32  algorithm  = 3;
+  string public_key = 4;
+  int32  key_tag    = 5;
+}
+
+// DSRecord holds one DS resource record (RFC 4034 §5).
+message DSRecord {
+  int32  key_tag     = 1;
+  int32  algorithm   = 2;
+  int32  digest_type = 3;
+  string digest      = 4;
+}
+
+// DNSEvidenceBundle carries the full DNSSEC validation chain for a domain.
+message DNSEvidenceBundle {
+  repeated string        txt_records    = 1;
+  repeated RRSIGRecord   txt_rrsigs     = 2;
+  repeated DNSKEYRecord  zone_dnskeys   = 3;
+  repeated RRSIGRecord   dnskey_rrsigs  = 4;
+  repeated DSRecord      parent_ds      = 5;
+  int64  collected_at = 6;
+  string resolver     = 7;
+}
+
+// MsgRegisterIdentity registers a new DNS-anchored signing identity.
+message MsgRegisterIdentity {
+  option (cosmos.msg.v1.signer) = "cosmos_addr";
+
+  string cosmos_addr      = 1;
+  string domain           = 2;
+  string selector         = 3;
+  string public_key_hex   = 4;
+  string name             = 5;
+  string uri              = 6;
+  uint32 flags            = 7;
+  string domain_proof_sig = 8;
+  int64  published_at     = 9;
+  DNSEvidenceBundle evidence = 10;
+  int64  ttl_seconds      = 11;
+}
+
+message MsgRegisterIdentityResponse {
+  string identity_id = 1;
+  string domain      = 2;
+  string selector    = 3;
+  string status      = 4;
+  int64  expires_at  = 5;
+}
+
+// MsgRotateIdentityKey performs a DKIM-style dual-selector key rotation.
+message MsgRotateIdentityKey {
+  option (cosmos.msg.v1.signer) = "cosmos_addr";
+
+  string cosmos_addr              = 1;
+  string new_selector             = 2;
+  string new_public_key_hex       = 3;
+  string rotation_auth_sig        = 4;
+  string new_key_domain_proof_sig = 5;
+  int64  rotated_at               = 6;
+  DNSEvidenceBundle evidence      = 7;
+  string notes                    = 8;
+}
+
+message MsgRotateIdentityKeyResponse {
+  string identity_id = 1;
+}
+
+// MsgRevokeIdentity voluntarily revokes an identity record (permanent).
+message MsgRevokeIdentity {
+  option (cosmos.msg.v1.signer) = "cosmos_addr";
+
+  string cosmos_addr = 1;
+  string reason      = 2;
+}
+
+message MsgRevokeIdentityResponse {}
+
+// MsgRenewIdentity extends the expiry of an identity record.
+message MsgRenewIdentity {
+  option (cosmos.msg.v1.signer) = "cosmos_addr";
+
+  string cosmos_addr = 1;
+  DNSEvidenceBundle evidence = 2;
+  int64  ttl_seconds = 3;
+}
+
+message MsgRenewIdentityResponse {
+  int64 expires_at = 1;
+}

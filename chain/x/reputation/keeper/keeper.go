@@ -199,9 +199,6 @@ func (k Keeper) SetBlacklisted(ctx sdk.Context, attester string, blacklisted boo
 	return k.SetReputation(ctx, rec)
 }
 
-// SetMinimumTier is a no-op stub — tier is computed from score.
-func (k Keeper) SetMinimumTier(_ sdk.Context, _ string, _ uint32) error { return nil }
-
 // ============================================================
 // Lazy decay
 // ============================================================

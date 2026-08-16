@@ -67,6 +67,16 @@ func (d AttesterEligibilityDecorator) AnteHandle(
 			return ctx, errors.Wrapf(attesttypes.ErrInsufficientReputation,
 				"score=%d required=%d", rs, params.MinReputationToAttest)
 		}
+
+		// Check minimum delegation.
+		delegated, err := d.attestKeeper.HasMinDelegation(ctx, pub.Attester)
+		if err != nil {
+			return ctx, errors.Wrap(sdkerrors.ErrLogic, "failed to load delegation")
+		}
+		if !delegated {
+			return ctx, errors.Wrapf(attesttypes.ErrInsufficientDelegation,
+				"attester %s below minimum delegation", pub.Attester)
+		}
 	}
 
 	return next(ctx, tx, simulate)

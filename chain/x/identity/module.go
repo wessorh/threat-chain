@@ -17,6 +17,7 @@ import (
 	identitycli "github.com/threatattest/chain/x/identity/cli"
 	"github.com/threatattest/chain/x/identity/keeper"
 	"github.com/threatattest/chain/x/identity/types"
+	pb "github.com/threatattest/chain/x/identity/types/pb"
 )
 
 // Ensure AppModule implements all required interfaces.
@@ -43,8 +44,17 @@ func (AppModuleBasic) Name() string { return types.ModuleName }
 // RegisterLegacyAminoCodec is a no-op (no legacy amino types needed).
 func (AppModuleBasic) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
 
-// RegisterInterfaces is a no-op (proto codec registration done at app level).
-func (AppModuleBasic) RegisterInterfaces(_ codectypes.InterfaceRegistry) {}
+// RegisterInterfaces registers the module's sdk.Msg types with the codec so
+// they can be decoded from tx Any values and routed by the MsgServiceRouter.
+func (AppModuleBasic) RegisterInterfaces(registry codectypes.InterfaceRegistry) {
+	registry.RegisterImplementations((*sdk.Msg)(nil),
+		&pb.MsgRegisterIdentity{},
+		&pb.MsgRotateIdentityKey{},
+		&pb.MsgRevokeIdentity{},
+		&pb.MsgRenewIdentity{},
+	)
+	pb.RegisterMsgServiceDesc(registry)
+}
 
 // DefaultGenesis returns the default genesis state as raw JSON.
 func (AppModuleBasic) DefaultGenesis(cdc codec.JSONCodec) json.RawMessage {
@@ -95,14 +105,13 @@ func (am AppModule) IsOnePerModuleType() {}
 // ConsensusVersion returns the module's consensus version.
 func (am AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 
-// RegisterServices registers the module's message and query servers (no-op for now).
-func (am AppModule) RegisterServices(_ module.Configurator) {}
+// RegisterServices registers the module's gRPC MsgServer.
+func (am AppModule) RegisterServices(cfg module.Configurator) {
+	pb.RegisterMsgServer(cfg.MsgServer(), &wireMsgServer{k: am.keeper})
+}
 
 // RegisterGRPCGatewayRoutes is a no-op.
 func (am AppModule) RegisterGRPCGatewayRoutes(_ client.Context, _ *runtime.ServeMux) {}
-
-// RegisterInterfaces is a no-op.
-func (am AppModule) RegisterInterfaces(_ codectypes.InterfaceRegistry) {}
 
 // RegisterLegacyAminoCodec is a no-op.
 func (am AppModule) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
@@ -133,9 +142,11 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, _ codec.JSONCodec) json.RawMe
 	return bz
 }
 
-// EndBlock runs end-block logic: processes expired identities.
+// EndBlock runs end-block logic: promotes verified identities and expires
+// stale ones.
 func (am AppModule) EndBlock(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	am.keeper.ProcessVerificationEpoch(sdkCtx)
 	am.keeper.ProcessExpiredIdentities(sdkCtx)
 	return nil
 }

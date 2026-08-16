@@ -4,6 +4,8 @@ package types
 
 import (
 	"fmt"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 const (
@@ -111,6 +113,9 @@ type Params struct {
 	// IPFSGatewayURL is the HTTP gateway for fetching CID content.
 	// In a production deployment this is configured per-validator.
 	IPFSGatewayURL            string `json:"ipfs_gateway_url"`
+	// RelayerWhitelist is the set of addresses allowed to submit verification
+	// reports. An empty whitelist allows all relayers.
+	RelayerWhitelist          []string `json:"relayer_whitelist"`
 }
 
 // DefaultParams returns sensible defaults.
@@ -119,7 +124,22 @@ func DefaultParams() Params {
 		VerificationTimeoutBlocks: 300,   // ~10 minutes at 2 s blocks
 		MaxRetries:                3,
 		IPFSGatewayURL:            "https://ipfs.io/ipfs/",
+		RelayerWhitelist:          []string{},
 	}
+}
+
+// IsRelayerAllowed reports whether the given relayer address may submit
+// verification reports. An empty whitelist allows all relayers.
+func (p Params) IsRelayerAllowed(addr string) bool {
+	if len(p.RelayerWhitelist) == 0 {
+		return true
+	}
+	for _, w := range p.RelayerWhitelist {
+		if w == addr {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate checks that all parameters are within acceptable bounds.
@@ -129,6 +149,11 @@ func (p Params) Validate() error {
 	}
 	if p.MaxRetries == 0 {
 		return fmt.Errorf("max_retries must be > 0")
+	}
+	for i, addr := range p.RelayerWhitelist {
+		if _, err := sdk.AccAddressFromBech32(addr); err != nil {
+			return fmt.Errorf("relayer_whitelist[%d] is not a valid bech32 address: %w", i, err)
+		}
 	}
 	return nil
 }

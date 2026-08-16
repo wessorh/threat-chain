@@ -14,8 +14,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
+	identitycli "github.com/threatattest/chain/x/ipfsverify/cli"
 	"github.com/threatattest/chain/x/ipfsverify/keeper"
+	ipfsquery "github.com/threatattest/chain/x/ipfsverify/query"
 	"github.com/threatattest/chain/x/ipfsverify/types"
+	pb "github.com/threatattest/chain/x/ipfsverify/types/pb"
 )
 
 var (
@@ -35,7 +38,12 @@ type AppModuleBasic struct{}
 
 func (AppModuleBasic) Name() string                { return types.ModuleName }
 func (AppModuleBasic) RegisterLegacyAminoCodec(_ *codec.LegacyAmino) {}
-func (AppModuleBasic) RegisterInterfaces(_ codectypes.InterfaceRegistry) {}
+func (AppModuleBasic) RegisterInterfaces(registry codectypes.InterfaceRegistry) {
+	registry.RegisterImplementations((*sdk.Msg)(nil),
+		&pb.MsgSubmitVerificationReport{},
+	)
+	pb.RegisterMsgServiceDesc(registry)
+}
 
 func (AppModuleBasic) DefaultGenesis(_ codec.JSONCodec) json.RawMessage {
 	bz, _ := json.Marshal(types.DefaultGenesisState())
@@ -70,7 +78,10 @@ func (am AppModule) ConsensusVersion() uint64 { return ConsensusVersion }
 func (am AppModule) IsOnePerModuleType()      {}
 func (am AppModule) IsAppModule()             {}
 
-func (am AppModule) RegisterServices(_ module.Configurator) {}
+func (am AppModule) RegisterServices(cfg module.Configurator) {
+	pb.RegisterMsgServer(cfg.MsgServer(), &wireMsgServer{k: am.keeper})
+	pb.RegisterQueryServer(cfg.QueryServer(), ipfsquery.NewQueryServer(am.keeper))
+}
 
 func (am AppModule) InitGenesis(ctx sdk.Context, _ codec.JSONCodec, data json.RawMessage) {
 	var gs types.GenesisState
@@ -114,4 +125,4 @@ func (am AppModule) EndBlock(ctx context.Context) error {
 
 func (am AppModule) QuerierRoute() string     { return types.ModuleName }
 func (am AppModule) GetQueryCmd() interface{} { return nil }
-func (am AppModule) GetTxCmd() interface{}    { return nil }
+func (am AppModule) GetTxCmd() interface{}    { return identitycli.NewTxCmd() }

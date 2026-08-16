@@ -86,6 +86,20 @@ type QueryParamsResponse struct {
 	Params types.Params `json:"params"`
 }
 
+// QuerySubscriptionRequest returns the API subscription tier for a subscriber.
+type QuerySubscriptionRequest struct {
+	Subscriber string `json:"subscriber"`
+}
+
+// QuerySubscriptionResponse carries the tier, rate limit, and feature bitmask.
+type QuerySubscriptionResponse struct {
+	Subscriber string `json:"subscriber"`
+	Tier       int32  `json:"tier"`
+	RateLimit  int32  `json:"rate_limit"`
+	Features   int32  `json:"features"`
+	Active     bool   `json:"active"`
+}
+
 // QueryIsMaliciousURLRequest looks up by raw URL string.
 type QueryIsMaliciousURLRequest struct {
 	URL string `json:"url"`
@@ -297,6 +311,29 @@ func (q *QueryServer) Params(goCtx context.Context, _ *QueryParamsRequest) (*Que
 		return nil, err
 	}
 	return &QueryParamsResponse{Params: p}, nil
+}
+
+// Subscription returns the API subscription tier, rate limit, and feature
+// bitmask for a subscriber address. An off-chain gateway uses this to enforce
+// per-tier rate limiting.
+func (q *QueryServer) Subscription(goCtx context.Context, req *QuerySubscriptionRequest) (*QuerySubscriptionResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	subscriber := req.Subscriber
+	tier := q.keeper.GetSubscriptionTier(ctx, subscriber)
+	cfg := types.TierConfigs[tier]
+
+	active := false
+	if rec, found := q.keeper.GetSubscription(ctx, subscriber); found {
+		active = rec.IsActive(ctx.BlockTime().Unix())
+	}
+
+	return &QuerySubscriptionResponse{
+		Subscriber: subscriber,
+		Tier:       int32(tier),
+		RateLimit:  cfg.RateLimit,
+		Features:   cfg.Features,
+		Active:     active,
+	}, nil
 }
 
 // ============================================================

@@ -13,6 +13,7 @@ coverage.txt
 coverage.html
 cpu.prof
 mem.prof
+.key-material.txt
 
 # Go module cache / vendor
 vendor/

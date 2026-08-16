@@ -103,6 +103,19 @@ func NewAppModule(k keeper.Keeper) AppModule {
 	}
 }
 
+// SetIdentityKeeper injects the identity keeper for tier-based confidence
+// scaling. Call during app wiring; when not called the module defaults to
+// Tier 0 (ANONYMOUS) for every attester.
+func (am *AppModule) SetIdentityKeeper(k keeper.IdentityTierKeeper) {
+	am.msgServer.SetIdentityKeeper(k)
+}
+
+// SetIPFSVerifyKeeper injects the ipfsverify keeper for detection-rule job
+// creation. Call during app wiring; when not called no jobs are enqueued.
+func (am *AppModule) SetIPFSVerifyKeeper(k keeper.IPFSVerifyKeeper) {
+	am.msgServer.SetIPFSVerifyKeeper(k)
+}
+
 // Name returns the module name.
 func (am AppModule) Name() string { return types.ModuleName }
 

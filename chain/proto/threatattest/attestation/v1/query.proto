@@ -20,6 +20,19 @@ service Query {
   rpc GetDispute(QueryGetDisputeRequest) returns (QueryGetDisputeResponse);
   rpc IsBlacklisted(QueryIsBlacklistedRequest) returns (QueryIsBlacklistedResponse);
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse);
+  rpc Subscription(QuerySubscriptionRequest) returns (QuerySubscriptionResponse);
+}
+
+message QuerySubscriptionRequest {
+  string subscriber = 1;
+}
+
+message QuerySubscriptionResponse {
+  string subscriber = 1;
+  int32  tier       = 2; // SubscriptionTier enum value
+  int32  rate_limit = 3; // max requests per minute
+  int32  features   = 4; // feature bitmask
+  bool   active     = 5; // whether the subscription is active (not expired)
 }
 
 // AttestationRecord is the canonical on-chain threat intelligence record.

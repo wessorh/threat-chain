@@ -42,6 +42,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
+	bankcli "github.com/cosmos/cosmos-sdk/x/bank/client/cli"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
@@ -51,6 +52,8 @@ import (
 	tatapp "github.com/threatattest/chain/app"
 	attesttypes "github.com/threatattest/chain/x/attestation/types"
 	pb "github.com/threatattest/chain/x/attestation/types/pb"
+	identitycli "github.com/threatattest/chain/x/identity/cli"
+	ipfsverifycli "github.com/threatattest/chain/x/ipfsverify/cli"
 )
 
 // DefaultNodeHome is the default home directory for the node.
@@ -867,6 +870,8 @@ func queryCommand() *cobra.Command {
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
 		attestationQueryCmds(),
+		identitycli.NewQueryCmd(),
+		ipfsverifycli.NewQueryCmd(),
 	)
 	return cmd
 }
@@ -888,7 +893,10 @@ func txCommand() *cobra.Command {
 		authcmd.GetBroadcastCommand(),
 		authcmd.GetEncodeCommand(),
 		authcmd.GetDecodeCommand(),
+		bankcli.NewTxCmd(addresscodec.NewBech32Codec(tatapp.Bech32Prefix)),
 		attestationTxCmds(),
+		identitycli.NewTxCmd(),
+		ipfsverifycli.NewTxCmd(),
 	)
 	return cmd
 }
@@ -1214,6 +1222,10 @@ func attestationTxCmds() *cobra.Command {
 		endorseAttestationCmd(),
 		revokeAttestationCmd(),
 		disputeAttestationCmd(),
+		updateParamsCmd(),
+		claimRewardCmd(),
+		subscribeCmd(),
+		unsubscribeCmd(),
 	)
 	return cmd
 }
@@ -1233,6 +1245,8 @@ For URL artifacts:    provide --raw-value with the full URL; the chain
                       verifies sha256(url) == artifact_sha256.
 For IPv4 artifacts:   provide --raw-value with the IP address; reserved
                       ranges (RFC-1918, loopback) are rejected.
+For EMAIL_BODY:       provide --holloman-signature (required) and either
+                      --artifact-sha256 or --raw-value (the body text).
 
 Examples:
   # Attest a malicious file
@@ -1277,15 +1291,17 @@ Examples:
 			categories, _ := cmd.Flags().GetStringSlice("category")
 			attesterDomain, _ := cmd.Flags().GetString("attester-domain")
 			attesterSelector, _ := cmd.Flags().GetString("attester-selector")
+			hollomanSig, _ := cmd.Flags().GetString("holloman-signature")
+			hammingMask, _ := cmd.Flags().GetInt32("hamming-mask")
 
 			// Validation
 			if artifactSHA256 == "" && rawValue == "" {
 				return errors.New("either --artifact-sha256 or --raw-value is required")
 			}
-			validTypes := map[string]int32{"FILE": 1, "URL": 2, "IPV4": 3, "DOMAIN": 4}
+			validTypes := map[string]int32{"FILE": 1, "URL": 2, "IPV4": 3, "DOMAIN": 4, "EMAIL_BODY": 5}
 			artifactTypeInt, ok := validTypes[artifactType]
 			if !ok {
-				return fmt.Errorf("invalid --artifact-type %q: must be FILE, URL, IPV4, or DOMAIN", artifactType)
+				return fmt.Errorf("invalid --artifact-type %q: must be FILE, URL, IPV4, DOMAIN, or EMAIL_BODY", artifactType)
 			}
 			validSeverities := map[string]int32{"LOW": 2, "MEDIUM": 3, "HIGH": 4, "CRITICAL": 5}
 			severityInt, ok := validSeverities[severity]
@@ -1307,6 +1323,17 @@ Examples:
 				return errors.New("--attester-domain is required when --attester-selector is set")
 			}
 
+			// Holloman perceptual-fingerprint validation
+			if hammingMask < 0 || hammingMask > 128 {
+				return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
+			}
+			if hollomanSig != "" && !attesttypes.IsValidHollomanSignature(hollomanSig) {
+				return errors.New("invalid --holloman-signature: must be 32 lowercase hex chars")
+			}
+			if artifactType == "EMAIL_BODY" && hollomanSig == "" {
+				return errors.New("--holloman-signature is required for EMAIL_BODY artifacts")
+			}
+
 			// If raw-value provided but no sha256, compute it based on artifact type
 			if artifactSHA256 == "" && rawValue != "" {
 				h := sha256.Sum256([]byte(rawValue))
@@ -1324,20 +1351,22 @@ Examples:
 			}
 
 			msg := &pb.MsgPublishAttestation{
-				Attester:         attester,
-				ArtifactType:     artifactTypeInt,
-				ArtifactSha256:   artifactSHA256,
-				RawValue:         rawValue,
-				Severity:         severityInt,
-				TtlSeconds:       ttl,
-				Confidence:       uint32(confidence),
-				Description:      description,
-				Tags:             tags,
-				ThreatCategories: categories,
-				AttesterSig:      attesterSig,
-				AttesterDomain:   attesterDomain,
-				AttesterSelector: attesterSelector,
-				PuaInfo:          buildPUAInfo(cmd),
+				Attester:          attester,
+				ArtifactType:      artifactTypeInt,
+				ArtifactSha256:    artifactSHA256,
+				HollomanSignature: hollomanSig,
+				HammingMask:       hammingMask,
+				RawValue:          rawValue,
+				Severity:          severityInt,
+				TtlSeconds:        ttl,
+				Confidence:        uint32(confidence),
+				Description:       description,
+				Tags:              tags,
+				ThreatCategories:  categories,
+				AttesterSig:       attesterSig,
+				AttesterDomain:    attesterDomain,
+				AttesterSelector:  attesterSelector,
+				PuaInfo:           buildPUAInfo(cmd),
 			}
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
@@ -1345,7 +1374,7 @@ Examples:
 	}
 
 	cmd.Flags().String("artifact-type", "FILE",
-		"Artifact type: FILE|URL|IPV4|DOMAIN")
+		"Artifact type: FILE|URL|IPV4|DOMAIN|EMAIL_BODY")
 	// PUA-specific flags (only used when --artifact-type FILE and --category includes TATST:PUA)
 	cmd.Flags().String("pua-software-name", "",
 		"(PUA) Display name of the software (e.g. 'SpeedBooster Pro')")
@@ -1360,7 +1389,11 @@ Examples:
 	cmd.Flags().String("artifact-sha256", "",
 		"Lowercase hex SHA-256 of the artifact (required for FILE type)")
 	cmd.Flags().String("raw-value", "",
-		"Raw value for URL/IPV4 artifacts (sha256 will be computed automatically)")
+		"Raw value for URL/IPV4/DOMAIN artifacts (sha256 will be computed automatically); for EMAIL_BODY it is the body text")
+	cmd.Flags().String("holloman-signature", "",
+		"128-bit holloman perceptual fingerprint (32 lowercase hex chars; required for EMAIL_BODY)")
+	cmd.Flags().Int32("hamming-mask", 0,
+		"Holloman hamming-mask radius (0-128); the attestation matches fingerprints within this Hamming distance")
 	cmd.Flags().String("severity", "MEDIUM",
 		"Severity level: UNSPECIFIED|LOW|MEDIUM|HIGH|CRITICAL")
 	cmd.Flags().Int("confidence", 80,
@@ -1535,6 +1568,97 @@ Example:
 		"Dispute ground: FALSE_POSITIVE|INCORRECT_SEVERITY|FABRICATED_EVIDENCE|STALE_REUSE|SYBIL_ATTACK")
 	cmd.Flags().String("evidence", "",
 		"Evidence supporting the dispute (max 1024 bytes)")
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func updateParamsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update-params",
+		Short: "Update x/attestation module parameters (governance-gated)",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			authority, _ := cmd.Flags().GetString("authority")
+			if authority == "" {
+				return errors.New("--authority is required")
+			}
+			paramsJSON, _ := cmd.Flags().GetString("params-json")
+			if paramsJSON == "" {
+				return errors.New("--params-json is required")
+			}
+			var params pb.Params
+			if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
+				return fmt.Errorf("invalid --params-json: %w", err)
+			}
+			msg := &pb.MsgUpdateParams{Authority: authority, Params: &params}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	cmd.Flags().String("authority", "", "Governance authority address (required)")
+	cmd.Flags().String("params-json", "", "Full Params object as JSON (required)")
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func claimRewardCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "claim-reward",
+		Short: "Claim the attester's share of the attestation incentive pool",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			msg := &pb.MsgClaimReward{Attester: clientCtx.GetFromAddress().String()}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func subscribeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "subscribe",
+		Short: "Lock tokens to activate a paid API tier",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			tier, _ := cmd.Flags().GetInt32("tier")
+			if tier < 1 || tier > 2 {
+				return fmt.Errorf("invalid --tier %d: must be 1 (PROFESSIONAL) or 2 (ENTERPRISE)", tier)
+			}
+			msg := &pb.MsgSubscribe{Subscriber: clientCtx.GetFromAddress().String(), Tier: tier}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	cmd.Flags().Int32("tier", 1, "Subscription tier: 1=PROFESSIONAL, 2=ENTERPRISE")
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func unsubscribeCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unsubscribe",
+		Short: "Unlock tokens and return to the FREE tier",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			msg := &pb.MsgUnsubscribe{Subscriber: clientCtx.GetFromAddress().String()}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }

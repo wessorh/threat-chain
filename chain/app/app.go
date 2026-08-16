@@ -76,6 +76,9 @@ import (
 	attestation "github.com/threatattest/chain/x/attestation"
 	attestkeeper "github.com/threatattest/chain/x/attestation/keeper"
 	attesttypes "github.com/threatattest/chain/x/attestation/types"
+	identity "github.com/threatattest/chain/x/identity"
+	identitykeeper "github.com/threatattest/chain/x/identity/keeper"
+	identitytypes "github.com/threatattest/chain/x/identity/types"
 	ipfsverify "github.com/threatattest/chain/x/ipfsverify"
 	ipfskeeper "github.com/threatattest/chain/x/ipfsverify/keeper"
 	reputation "github.com/threatattest/chain/x/reputation"
@@ -137,10 +140,38 @@ type ThreatAttestApp struct {
 	ConsensusKeeper consensuskeeper.Keeper
 
 	// Custom keepers
-	AttestKeeper attestkeeper.Keeper
-	RepKeeper    repkeeper.Keeper
-	IPFSKeeper   ipfskeeper.Keeper
-	MintKeeper   mintkeeper.Keeper
+	AttestKeeper    attestkeeper.Keeper
+	RepKeeper       repkeeper.Keeper
+	IPFSKeeper      ipfskeeper.Keeper
+	MintKeeper      mintkeeper.Keeper
+	IdentityKeeper  identitykeeper.Keeper
+}
+
+// identityTierAdapter adapts the x/identity keeper to the x/attestation
+// keeper.IdentityTierKeeper interface, bridging the sdk.Context parameter and
+// the ComplianceTier -> int32 return type.
+type identityTierAdapter struct {
+	keeper identitykeeper.Keeper
+}
+
+// GetTier returns the compliance tier (0-3) for an attester address.
+func (a identityTierAdapter) GetTier(ctx interface{}, cosmosAddr string) int32 {
+	sdkCtx, ok := ctx.(sdk.Context)
+	if !ok {
+		return 0
+	}
+	return int32(a.keeper.GetTier(sdkCtx, cosmosAddr))
+}
+
+// ipfsVerifyAdapter adapts the x/ipfsverify keeper to the x/attestation
+// keeper.IPFSVerifyKeeper interface (dropping the job return value).
+type ipfsVerifyAdapter struct {
+	keeper ipfskeeper.Keeper
+}
+
+func (a ipfsVerifyAdapter) SubmitVerificationJob(ctx sdk.Context, attestationID, ruleID, cid, expectedSHA256, submittedBy string) error {
+	_, err := a.keeper.SubmitVerificationJob(ctx, attestationID, ruleID, cid, expectedSHA256, submittedBy)
+	return err
 }
 
 // NewThreatAttestApp creates and fully wires the ThreatAttest application.
@@ -195,6 +226,7 @@ func NewThreatAttestApp(
 		reptypes.StoreKey,
 		"ipfsverify",
 		minttypes.StoreKey,
+		identitytypes.StoreKey,
 	)
 
 	app.MountKVStores(keys)
@@ -327,7 +359,7 @@ func NewThreatAttestApp(
 		runtime.NewKVStoreService(keys[attesttypes.StoreKey]),
 		logger,
 		app.RepKeeper,
-		nil,
+		app.StakingKeeper,
 		app.BankKeeper,
 		govAuthority,
 	)
@@ -349,7 +381,16 @@ func NewThreatAttestApp(
 		authtypes.FeeCollectorName,
 	)
 
+	app.IdentityKeeper = identitykeeper.NewKeeper(
+		keys[identitytypes.StoreKey],
+		cdc,
+	)
+
 	// ── Module manager ──────────────────────────────────────────────────────────
+
+	attestModule := attestation.NewAppModule(app.AttestKeeper)
+	attestModule.SetIdentityKeeper(identityTierAdapter{app.IdentityKeeper})
+	attestModule.SetIPFSVerifyKeeper(ipfsVerifyAdapter{app.IPFSKeeper})
 
 	app.mm = module.NewManager(
 		genutil.NewAppModule(app.AccountKeeper, app.StakingKeeper, app.BaseApp, encodingConfig.TxConfig),
@@ -367,8 +408,9 @@ func NewThreatAttestApp(
 		consensus.NewAppModule(cdc, app.ConsensusKeeper),
 		tatmint.NewAppModule(app.MintKeeper),
 		reputation.NewAppModule(app.RepKeeper),
-		attestation.NewAppModule(app.AttestKeeper),
+		attestModule,
 		ipfsverify.NewAppModule(app.IPFSKeeper),
+		identity.NewAppModule(app.IdentityKeeper),
 	)
 
 	app.mm.SetOrderPreBlockers(
@@ -394,6 +436,7 @@ func NewThreatAttestApp(
 		attesttypes.ModuleName,
 		reptypes.ModuleName,
 		"ipfsverify",
+		identitytypes.ModuleName,
 		feegranttypes.ModuleName,
 		authz.ModuleName,
 	)
@@ -416,6 +459,7 @@ func NewThreatAttestApp(
 		reptypes.ModuleName,
 		attesttypes.ModuleName,
 		"ipfsverify",
+		identitytypes.ModuleName,
 	}
 	app.mm.SetOrderInitGenesis(genesisOrder...)
 	app.mm.SetOrderExportGenesis(genesisOrder...)

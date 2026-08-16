@@ -14,6 +14,7 @@ import (
 	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	"github.com/threatattest/chain/x/attestation/types"
 )
@@ -24,13 +25,11 @@ type ReputationKeeper interface {
 	AddReputation(ctx sdk.Context, attester string, delta int32) error
 	SubReputation(ctx sdk.Context, attester string, delta uint32) error
 	IsBlacklisted(ctx sdk.Context, attester string) bool
-	SetMinimumTier(ctx sdk.Context, attester string, tier uint32) error
 }
 
 // StakingKeeper is the subset of x/staking keeper needed by x/attestation.
 type StakingKeeper interface {
-	GetDelegatorDelegations(ctx sdk.Context, delegator sdk.AccAddress, maxRetrieve uint16) ([]interface{}, error)
-	TotalBondedTokens(ctx sdk.Context) (math.Int, error)
+	GetDelegatorDelegations(ctx context.Context, delegator sdk.AccAddress, maxRetrieve uint16) ([]stakingtypes.Delegation, error)
 }
 
 // BankKeeper is the subset of x/bank keeper needed by x/attestation.
@@ -108,6 +107,36 @@ func (k Keeper) GetParams(ctx sdk.Context) (types.Params, error) {
 		return types.Params{}, errors.Wrap(types.ErrInvalidParams, err.Error())
 	}
 	return p, nil
+}
+
+// HasMinDelegation reports whether the attester's total delegated amount meets
+// the configured MinAttesterDelegation threshold. A zero/unset threshold, or an
+// unwired staking keeper, returns true (gate skipped).
+func (k Keeper) HasMinDelegation(ctx sdk.Context, attester string) (bool, error) {
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return false, err
+	}
+	min, ok := math.NewIntFromString(params.MinAttesterDelegation)
+	if !ok || min.IsZero() {
+		return true, nil
+	}
+	if k.stakingKeeper == nil {
+		return true, nil
+	}
+	addr, err := sdk.AccAddressFromBech32(attester)
+	if err != nil {
+		return false, err
+	}
+	delegations, err := k.stakingKeeper.GetDelegatorDelegations(ctx, addr, 16)
+	if err != nil {
+		return false, err
+	}
+	total := math.LegacyZeroDec()
+	for _, d := range delegations {
+		total = total.Add(d.Shares)
+	}
+	return total.TruncateInt().GTE(min), nil
 }
 
 // ============================================================
@@ -965,6 +994,15 @@ func (k Keeper) GetClaimEpoch(ctx sdk.Context, attester string) (uint64, error) 
 		return 0, nil
 	}
 	return binary.BigEndian.Uint64(bz), nil
+}
+
+// HasClaimEpoch reports whether the attester has ever recorded a reward claim.
+// It distinguishes "no claim yet" from "claimed at epoch 0", both of which
+// surface as a 0 from GetClaimEpoch.
+func (k Keeper) HasClaimEpoch(ctx sdk.Context, attester string) bool {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := kvStore.Get(types.ClaimEpochKey(attester))
+	return err == nil && bz != nil
 }
 
 // SetClaimEpoch records the epoch in which the attester claimed a reward.

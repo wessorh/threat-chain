@@ -18,7 +18,8 @@ import (
 // MsgServer implements the attestation message handlers.
 type MsgServer struct {
 	Keeper
-	identityKeeper IdentityTierKeeper
+	identityKeeper   IdentityTierKeeper
+	ipfsVerifyKeeper IPFSVerifyKeeper
 }
 
 // NewMsgServer returns a new MsgServer backed by the given Keeper.
@@ -30,6 +31,12 @@ func NewMsgServer(k Keeper) *MsgServer {
 // scaling. Call during app wiring. If not called, defaults to Tier 0.
 func (s *MsgServer) SetIdentityKeeper(k IdentityTierKeeper) {
 	s.identityKeeper = k
+}
+
+// SetIPFSVerifyKeeper injects the ipfsverify keeper for detection-rule job
+// creation. Call during app wiring. If not called, no jobs are enqueued.
+func (s *MsgServer) SetIPFSVerifyKeeper(k IPFSVerifyKeeper) {
+	s.ipfsVerifyKeeper = k
 }
 
 // ============================================================
@@ -115,6 +122,18 @@ func (s *MsgServer) PublishAttestation(goCtx context.Context, msg *msgs.MsgPubli
 
 	if err := s.PublishAttestationRecord(ctx, rec); err != nil {
 		return nil, err
+	}
+
+	// Enqueue IPFS verification jobs for detection rules that carry a CID.
+	if s.ipfsVerifyKeeper != nil {
+		for _, rule := range msg.DetectionRules {
+			if rule.CID == "" {
+				continue
+			}
+			_ = s.ipfsVerifyKeeper.SubmitVerificationJob(
+				ctx, attestationID, rule.RuleID, rule.CID, rule.ContentSHA256, msg.Attester,
+			)
+		}
 	}
 
 	// Reputation reward for first-time contributors
@@ -310,6 +329,13 @@ type IdentityTierKeeper interface {
 	GetTier(ctx interface{}, cosmosAddr string) int32
 }
 
+// IPFSVerifyKeeper is the interface the attestation keeper uses to enqueue
+// IPFS detection-rule verification jobs. This avoids a hard import of the
+// x/ipfsverify package (prevents circular dependencies).
+type IPFSVerifyKeeper interface {
+	SubmitVerificationJob(ctx sdk.Context, attestationID, ruleID, cid, expectedSHA256, submittedBy string) error
+}
+
 // identityTier returns the compliance tier (0-3) for the given attester.
 // Delegates to the wired IdentityTierKeeper. If not wired, defaults to
 // Tier 0 (ANONYMOUS) so the module compiles and runs without identity.
@@ -371,7 +397,7 @@ func (s *MsgServer) ClaimReward(goCtx context.Context, msg *msgs.MsgClaimReward)
 	if err != nil {
 		return nil, err
 	}
-	if lastClaim == epoch {
+	if lastClaim == epoch && s.Keeper.HasClaimEpoch(ctx, msg.Attester) {
 		return nil, errors.Wrap(types.ErrRateLimitExceeded, "already claimed this epoch")
 	}
 

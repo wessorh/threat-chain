@@ -299,3 +299,17 @@ func (w *wireQueryServer) Params(ctx context.Context, m *pb.QueryParamsRequest) 
 	}
 	return queryToPbParamsResp(resp), nil
 }
+
+func (w *wireQueryServer) Subscription(ctx context.Context, m *pb.QuerySubscriptionRequest) (*pb.QuerySubscriptionResponse, error) {
+	resp, err := w.inner.Subscription(ctx, &attestquery.QuerySubscriptionRequest{Subscriber: m.GetSubscriber()})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.QuerySubscriptionResponse{
+		Subscriber: resp.Subscriber,
+		Tier:       resp.Tier,
+		RateLimit:  resp.RateLimit,
+		Features:   resp.Features,
+		Active:     resp.Active,
+	}, nil
+}

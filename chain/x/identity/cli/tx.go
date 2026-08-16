@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/threatattest/chain/x/identity/types"
+	pb "github.com/threatattest/chain/x/identity/types/pb"
 )
 
 // RootTxCmd is the type alias used by module.go GetTxCmd().
@@ -114,7 +115,7 @@ func runRegisterIdentity(cmd *cobra.Command, _ []string) error {
 		publishedAt = time.Now().Unix()
 	}
 
-	msg := &types.MsgRegisterIdentity{
+	msg := &pb.MsgRegisterIdentity{
 		CosmosAddr:     clientCtx.GetFromAddress().String(),
 		Domain:         domain,
 		Selector:       selector,
@@ -122,9 +123,9 @@ func runRegisterIdentity(cmd *cobra.Command, _ []string) error {
 		DomainProofSig: proofSig,
 		PublishedAt:    publishedAt,
 		Name:           name,
-		URI:            uri,
-		TTLSeconds:     ttl,
-		Flags:          types.IdentityFlag(flagBits),
+		Uri:            uri,
+		TtlSeconds:     ttl,
+		Flags:          flagBits,
 	}
 
 	// Load evidence bundle from file if provided
@@ -133,15 +134,11 @@ func runRegisterIdentity(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("cannot read evidence file %q: %w", evidenceFile, err)
 		}
-		var bundle types.DNSEvidenceBundle
+		var bundle pb.DNSEvidenceBundle
 		if err := json.Unmarshal(bz, &bundle); err != nil {
 			return fmt.Errorf("cannot parse evidence file %q: %w", evidenceFile, err)
 		}
 		msg.Evidence = &bundle
-	}
-
-	if err := msg.ValidateBasic(); err != nil {
-		return fmt.Errorf("message validation failed: %w", err)
 	}
 
 	return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
@@ -214,7 +211,7 @@ func runRotateIdentityKey(cmd *cobra.Command, _ []string) error {
 		rotatedAt = time.Now().Unix()
 	}
 
-	msg := &types.MsgRotateIdentityKey{
+	msg := &pb.MsgRotateIdentityKey{
 		CosmosAddr:           clientCtx.GetFromAddress().String(),
 		NewSelector:          newSelector,
 		NewPublicKeyHex:      newPubkey,
@@ -229,15 +226,11 @@ func runRotateIdentityKey(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("cannot read evidence file %q: %w", evidenceFile, err)
 		}
-		var bundle types.DNSEvidenceBundle
+		var bundle pb.DNSEvidenceBundle
 		if err := json.Unmarshal(bz, &bundle); err != nil {
 			return fmt.Errorf("cannot parse evidence file %q: %w", evidenceFile, err)
 		}
 		msg.Evidence = &bundle
-	}
-
-	if err := msg.ValidateBasic(); err != nil {
-		return fmt.Errorf("message validation failed: %w", err)
 	}
 
 	return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
@@ -279,13 +272,9 @@ func runRevokeIdentity(cmd *cobra.Command, _ []string) error {
 
 	reason, _ := cmd.Flags().GetString("reason")
 
-	msg := &types.MsgRevokeIdentity{
+	msg := &pb.MsgRevokeIdentity{
 		CosmosAddr: clientCtx.GetFromAddress().String(),
 		Reason:     reason,
-	}
-
-	if err := msg.ValidateBasic(); err != nil {
-		return fmt.Errorf("message validation failed: %w", err)
 	}
 
 	return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
@@ -339,19 +328,15 @@ func runRenewIdentity(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("cannot read evidence file %q: %w", evidenceFile, err)
 	}
-	var bundle types.DNSEvidenceBundle
+	var bundle pb.DNSEvidenceBundle
 	if err := json.Unmarshal(bz, &bundle); err != nil {
 		return fmt.Errorf("cannot parse evidence file %q: %w", evidenceFile, err)
 	}
 
-	msg := &types.MsgRenewIdentity{
+	msg := &pb.MsgRenewIdentity{
 		CosmosAddr: clientCtx.GetFromAddress().String(),
-		Evidence:   bundle,
-		TTLSeconds: ttl,
-	}
-
-	if err := msg.ValidateBasic(); err != nil {
-		return fmt.Errorf("message validation failed: %w", err)
+		Evidence:   &bundle,
+		TtlSeconds: ttl,
 	}
 
 	return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)

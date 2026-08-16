@@ -1,0 +1,40 @@
+syntax = "proto3";
+package threatattest.ipfsverify;
+
+import "cosmos/msg/v1/msg.proto";
+
+option go_package = "github.com/threatattest/chain/x/ipfsverify/types/pb";
+
+// Msg service for x/ipfsverify. The off-chain verifier daemon submits
+// verification reports; the keeper marks the referenced detection rule
+// verified (or invalid) based on the SHA-256 match.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  rpc SubmitVerificationReport(MsgSubmitVerificationReport) returns (MsgSubmitVerificationReportResponse);
+}
+
+// VerificationReport carries the outcome of fetching and hashing an IPFS CID.
+message VerificationReport {
+  string job_id           = 1;
+  string attestation_id   = 2;
+  string rule_id          = 3;
+  string cid              = 4;
+  string expected_sha256  = 5;
+  string actual_sha256    = 6;
+  bool   matched          = 7;
+  int64  verified_at      = 8;
+  string verified_by      = 9;
+  string error_msg        = 10;
+}
+
+// MsgSubmitVerificationReport is submitted by the off-chain verifier daemon
+// (running as a whitelisted relayer) after fetching and hashing CID content.
+message MsgSubmitVerificationReport {
+  option (cosmos.msg.v1.signer) = "sender";
+
+  string             sender = 1;
+  VerificationReport report = 2;
+}
+
+message MsgSubmitVerificationReportResponse {}

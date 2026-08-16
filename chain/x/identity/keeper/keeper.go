@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store/v2/prefix"
 	storetypes "github.com/cosmos/cosmos-sdk/store/v2/types"
@@ -15,43 +14,21 @@ import (
 	"github.com/threatattest/chain/x/identity/types"
 )
 
-// Keeper is the x/identity module keeper.  It holds a reference to the KV store
-// and the codec, plus optional references to other module keepers needed for
-// trust-score updates and stake queries.
+// Keeper is the x/identity module keeper. It holds a reference to the KV store
+// and the codec.
 type Keeper struct {
 	storeKey storetypes.StoreKey
 	cdc      codec.BinaryCodec
-
-	// bankKeeper is used to query utat balances for stake tier checks.
-	// Typed as interface to avoid a hard import cycle.
-	bankKeeper BankKeeper
-
-	// stakingKeeper is used to query delegations for tier-1 qualification.
-	stakingKeeper StakingKeeper
-}
-
-// BankKeeper defines the bank module methods used by x/identity.
-type BankKeeper interface {
-	GetAllBalances(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
-}
-
-// StakingKeeper defines the staking module methods used by x/identity.
-type StakingKeeper interface {
-	TotalBondedTokens(ctx sdk.Context) (math.Int, error)
 }
 
 // NewKeeper constructs a new identity Keeper.
 func NewKeeper(
 	storeKey storetypes.StoreKey,
 	cdc codec.BinaryCodec,
-	bankKeeper BankKeeper,
-	stakingKeeper StakingKeeper,
 ) Keeper {
 	return Keeper{
-		storeKey:      storeKey,
-		cdc:           cdc,
-		bankKeeper:    bankKeeper,
-		stakingKeeper: stakingKeeper,
+		storeKey: storeKey,
+		cdc:      cdc,
 	}
 }
 
@@ -188,6 +165,23 @@ func (k Keeper) GetPending(ctx sdk.Context, cosmosAddr string) (types.DNSIdentit
 func (k Keeper) DeletePending(ctx sdk.Context, cosmosAddr string) {
 	store := ctx.KVStore(k.storeKey)
 	store.Delete(types.IDPendingKey(cosmosAddr))
+}
+
+// IteratePending iterates over all PENDING identity records.
+func (k Keeper) IteratePending(ctx sdk.Context, cb func(types.DNSIdentityRecord) bool) {
+	store := ctx.KVStore(k.storeKey)
+	pStore := prefix.NewStore(store, []byte{types.IDPendingPrefix})
+	iter := pStore.Iterator(nil, nil)
+	defer iter.Close()
+	for ; iter.Valid(); iter.Next() {
+		var rec types.DNSIdentityRecord
+		if err := json.Unmarshal(iter.Value(), &rec); err != nil {
+			continue
+		}
+		if cb(rec) {
+			break
+		}
+	}
 }
 
 // PromotePending promotes a PENDING record to ACTIVE: removes from pending

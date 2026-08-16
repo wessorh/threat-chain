@@ -7,6 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/threatattest/chain/x/identity/types"
@@ -356,6 +359,49 @@ func (k Keeper) ProcessExpiredIdentities(ctx sdk.Context) {
 	}
 }
 
+// ProcessVerificationEpoch promotes PENDING identities to ACTIVE once they
+// have aged past the DNS verification epoch (DNSVerificationEpochBlocks).
+// Each promotion awards the registration trust score bonus. Called from the
+// module EndBlocker.
+//
+// Note: DNS_REMOVED (re-resolving the TXT record to confirm it still exists)
+// is intentionally not performed here — block execution must remain
+// deterministic, so that transition requires an off-chain oracle submitting
+// evidence rather than an in-process DNS query.
+func (k Keeper) ProcessVerificationEpoch(ctx sdk.Context) {
+	epoch := k.GetParams(ctx).DNSVerificationEpochBlocks
+	if epoch < 1 {
+		return
+	}
+	height := ctx.BlockHeight()
+	now := ctx.BlockTime().Unix()
+
+	var promote []string
+	k.IteratePending(ctx, func(rec types.DNSIdentityRecord) bool {
+		if height-rec.RegisteredAtBlock >= epoch {
+			promote = append(promote, rec.CosmosAddr)
+		}
+		return false
+	})
+
+	for _, addr := range promote {
+		if err := k.PromotePending(ctx, addr, now); err != nil {
+			continue
+		}
+		_ = k.OnRegistration(ctx, addr)
+		rec, found := k.GetRecord(ctx, addr)
+		if !found {
+			continue
+		}
+		ctx.EventManager().EmitEvent(sdk.NewEvent(
+			EventTypeIdentityVerified,
+			sdk.NewAttribute(AttributeKeyCosmosAddr, addr),
+			sdk.NewAttribute(AttributeKeyDomain, rec.Domain),
+			sdk.NewAttribute(AttributeKeyStatus, types.DNSIDStatus_ACTIVE.String()),
+		))
+	}
+}
+
 // ============================================================
 // Internal helpers
 // ============================================================
@@ -375,9 +421,7 @@ func rotationAuthPayload(domain, oldSelector, newSelector, cosmosAddr string, ro
 //
 //   pubKeyHex  — compressed secp256k1 public key (hex, 66 chars = 33 bytes)
 //   payload    — the 32-byte message digest that was signed
-//   sigHex     — DER-encoded signature (hex, 128 chars = 64 bytes)
-//
-// Production note: replace the stub below with btcec or tendermint/crypto/secp256k1.
+//   sigHex     — compact R||S signature (hex, 128 chars = 64 bytes)
 func verifySecp256k1Sig(pubKeyHex string, payload []byte, sigHex string) error {
 	if len(pubKeyHex) != types.PubKeyHexLen {
 		return fmt.Errorf("public key hex length %d != %d", len(pubKeyHex), types.PubKeyHexLen)
@@ -385,19 +429,39 @@ func verifySecp256k1Sig(pubKeyHex string, payload []byte, sigHex string) error {
 	if len(sigHex) != types.MaxProofHex {
 		return fmt.Errorf("signature hex length %d != %d", len(sigHex), types.MaxProofHex)
 	}
-	_, err := hex.DecodeString(pubKeyHex)
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
 	if err != nil {
 		return fmt.Errorf("public key is not valid hex: %w", err)
 	}
-	_, err = hex.DecodeString(sigHex)
+	sigBytes, err := hex.DecodeString(sigHex)
 	if err != nil {
 		return fmt.Errorf("signature is not valid hex: %w", err)
 	}
-	// TODO(production): uncomment and use btcec:
-	//   pubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
-	//   sig, err := btcec.ParseDERSignature(sigBytes, btcec.S256())
-	//   if !sig.Verify(payload, pubKey) { return fmt.Errorf("signature verification failed") }
-	return nil // stub: structural validation only
+	if len(sigBytes) != 64 {
+		return fmt.Errorf("signature must be 64 bytes (R||S), got %d", len(sigBytes))
+	}
+
+	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
+	if err != nil {
+		return fmt.Errorf("invalid secp256k1 public key: %w", err)
+	}
+
+	var r, s secp256k1.ModNScalar
+	if r.SetByteSlice(sigBytes[:32]) {
+		return fmt.Errorf("signature r component out of range")
+	}
+	if s.SetByteSlice(sigBytes[32:]) {
+		return fmt.Errorf("signature s component out of range")
+	}
+	if s.IsOverHalfOrder() {
+		return fmt.Errorf("signature s component is over half order (non-canonical)")
+	}
+	sig := ecdsa.NewSignature(&r, &s)
+
+	if !sig.Verify(payload, pubKey) {
+		return fmt.Errorf("secp256k1 signature verification failed")
+	}
+	return nil
 }
 
 // ============================================================
@@ -411,6 +475,7 @@ const (
 	EventTypeIdentityRenewed    = "identity_renewed"
 	EventTypeIdentityExpired    = "identity_expired"
 	EventTypeIdentityDNSRemoved = "identity_dns_removed"
+	EventTypeIdentityVerified   = "identity_verified"
 
 	AttributeKeyCosmosAddr = "cosmos_addr"
 	AttributeKeyDomain     = "domain"

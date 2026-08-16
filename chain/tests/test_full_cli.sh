@@ -41,6 +41,16 @@ query() { "$BINARY" query attestation "$@" --home "$HOME_DIR" --node "$NODE" -o 
 # json_get <json> <python-expr> — extract a scalar from a JSON doc; "" on error.
 json_get() { python3 -c "import sys,json; d=json.load(sys.stdin); print($2)" <<<"$1" 2>/dev/null || true; }
 
+# committed_code <broadcast-json> — extract the tx hash, query the committed
+# result, and echo its on-chain code (the DeliverTx result, not mempool CheckTx).
+committed_code() {
+    local hash res
+    hash=$(echo "$1" | grep -oE '"txhash":"[^"]+"' | cut -d'"' -f4)
+    [ -z "$hash" ] && { echo ""; return; }
+    res=$("$BINARY" query tx "$hash" --home "$HOME_DIR" --node "$NODE" -o json 2>/dev/null)
+    json_get "$res" "d.get('code')"
+}
+
 # cleanup any prior run
 pkill -x threatattestd 2>/dev/null || true
 rm -rf "$HOME_DIR"
@@ -48,7 +58,8 @@ sleep 1
 
 info "Initialising fresh localnet ($CHAIN_ID)"
 bash "$ROOT_DIR/scripts/init-localnet.sh" --binary "$BINARY" --home "$HOME_DIR" \
-  --chain "$CHAIN_ID" --moniker cli --key "$KEY" --denom "$DENOM" >/dev/null 2>&1 || die "init-localnet failed"
+  --chain "$CHAIN_ID" --moniker cli --key "$KEY" --denom "$DENOM" \
+  --supply 2000000000000"$DENOM" --stake 100000000"$DENOM" >/dev/null 2>&1 || die "init-localnet failed"
 
 info "Starting node"
 nohup "$BINARY" start --home "$HOME_DIR" > /tmp/tatst-full-cli.log 2>&1 &
@@ -157,6 +168,30 @@ CODE=$(json_get "$R" "d.get('code')")
 R=$(tx_result dispute "$TARGET_ID" --ground FALSE_POSITIVE --evidence "smoke dispute")
 CODE=$(json_get "$R" "d.get('code')")
 [ -n "$CODE" ] && ok "dispute wired (code=$CODE)" || bad "dispute: $R"
+
+# ─────────────────────────────────────────────────────────────────────────────
+info "Testing subscription / reward / governance commands"
+
+# subscribe to PROFESSIONAL tier (locks 1000 TATST into the module account)
+R=$(tx_result subscribe --tier 1)
+CODE=$(committed_code "$R")
+[ "$CODE" = "0" ] && ok "subscribe (committed code 0)" || bad "subscribe: $R"
+
+# claim-reward from the now-funded incentive pool — first claim in this epoch succeeds
+R=$(tx_result claim-reward)
+CODE=$(committed_code "$R")
+[ "$CODE" = "0" ] && ok "claim-reward (committed code 0)" || bad "claim-reward: $R"
+
+# unsubscribe — returns the locked stake
+R=$(tx_result unsubscribe)
+CODE=$(committed_code "$R")
+[ "$CODE" = "0" ] && ok "unsubscribe (committed code 0)" || bad "unsubscribe: $R"
+
+# update-params from a non-governance address must be rejected on-chain
+PARAMS_JSON='{"min_attester_delegation":"1000000000","min_ttl_seconds":300,"max_ttl_seconds":2592000,"max_ttl_ipv4_seconds":86400,"max_detection_rules":32,"max_attestations_per_epoch":100,"dispute_bond_amount":"500000000","ipv4_min_confidence":30,"timestamp_tolerance_seconds":300,"min_reputation_to_attest":0,"min_reputation_to_endorse":10,"min_reputation_to_dispute":20}'
+R=$(tx_result update-params --authority "$ATTESTER" --params-json "$PARAMS_JSON")
+CODE=$(committed_code "$R")
+[ -n "$CODE" ] && [ "$CODE" != "0" ] && ok "update-params rejected (code=$CODE)" || bad "update-params: $R"
 
 # ─────────────────────────────────────────────────────────────────────────────
 info "Cleanup"

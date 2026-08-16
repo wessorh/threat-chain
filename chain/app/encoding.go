@@ -27,6 +27,7 @@ import (
 	"github.com/cosmos/gogoproto/proto"
 
 	attestation "github.com/threatattest/chain/x/attestation"
+	identity "github.com/threatattest/chain/x/identity"
 	ipfsverify "github.com/threatattest/chain/x/ipfsverify"
 	reputation "github.com/threatattest/chain/x/reputation"
 	tatmint "github.com/threatattest/chain/x/tatmint"
@@ -60,6 +61,7 @@ var ModuleBasics = module.NewBasicManager(
 	reputation.AppModuleBasic{},
 	attestation.AppModuleBasic{},
 	ipfsverify.AppModuleBasic{},
+	identity.AppModuleBasic{},
 )
 
 // MakeEncodingConfig builds an encoding config with all module interfaces

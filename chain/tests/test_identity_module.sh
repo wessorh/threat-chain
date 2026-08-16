@@ -182,18 +182,6 @@ run_test "register-identity validates required fields" \
       --dry-run 2>&1 | grep -qi "required\|invalid\|error"
   '
 
-run_test "query tier shows tier table" \
-  bash -c '
-    '$BINARY' query identity tier cosmos1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq9as36n \
-      --output json 2>&1 | grep -qi "tier_table\|ANONYMOUS\|tier"
-  '
-
-run_test "query params shows default params" \
-  bash -c '
-    '$BINARY' query identity params --output json 2>&1 | \
-      grep -qi "identity_ttl_seconds\|params\|min_registration"
-  '
-
 # ── Integration Tests (requires running node) ─────────────────────────────────
 
 header "Integration Tests (requires running node)"

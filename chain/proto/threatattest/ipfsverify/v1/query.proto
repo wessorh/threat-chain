@@ -1,0 +1,30 @@
+syntax = "proto3";
+package threatattest.ipfsverify;
+
+option go_package = "github.com/threatattest/chain/x/ipfsverify/types/pb";
+
+// Query service for x/ipfsverify — used by the off-chain verifier daemon to
+// discover pending jobs.
+service Query {
+  rpc PendingJobs(QueryPendingJobsRequest) returns (QueryPendingJobsResponse);
+}
+
+message QueryPendingJobsRequest {
+  uint32 max_count = 1;
+}
+
+message QueryPendingJobsResponse {
+  repeated VerificationJob jobs = 1;
+}
+
+// VerificationJob mirrors the on-chain job type for query responses.
+message VerificationJob {
+  string job_id           = 1;
+  string attestation_id   = 2;
+  string rule_id          = 3;
+  string cid              = 4;
+  string expected_sha256  = 5;
+  string submitted_by     = 6;
+  int32  status           = 7;
+  uint32 attempts         = 8;
+}

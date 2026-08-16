@@ -17,10 +17,8 @@ import (
 // DNSEvidenceBundle submitted with MsgRegisterIdentity and MsgRenewIdentity.
 //
 // Design notes:
-//   - Full cryptographic DNSSEC chain-of-trust verification requires a live
-//     DNS resolver and is intentionally left as a stub (ValidateDNSSECChain).
-//     In production this would call out to a trusted DNSSEC-validating resolver
-//     or use the dnssec-go library for in-process validation.
+//   - Full cryptographic DNSSEC chain-of-trust verification (DS→KSK linkage and
+//     RRSIG signature verification) is performed in-process in ValidateDNSSECChain.
 //   - Structural validation (presence of required fields, algorithm allow-list,
 //     freshness) is performed fully in-process.
 //   - The TAT TXT record is parsed and its fields are cross-checked against the
@@ -141,8 +139,8 @@ func ValidateEvidenceBundle(
 		}
 	}
 
-	// 9. Full cryptographic chain-of-trust (stub — see ValidateDNSSECChain)
-	return ValidateDNSSECChain(bundle, domain)
+	// 9. Full cryptographic chain-of-trust verification.
+	return ValidateDNSSECChain(bundle, domain, selector)
 }
 
 // validateTATTXTRecord parses all TXT records in the bundle looking for a
@@ -221,24 +219,4 @@ func checkAlgorithm(algNum int) error {
 	return nil
 }
 
-// ValidateDNSSECChain validates the full cryptographic DNSSEC chain of trust
-// for the submitted evidence bundle.
-//
-// Production implementation note:
-//   In a production deployment this function would:
-//   1. Verify each RRSIG over the TXT RRset using the matching DNSKEY.
-//   2. Verify each DNSKEY RRSIG using the KSK.
-//   3. Verify the KSK matches the DS record from the parent zone.
-//   4. Recurse up to the root trust anchor (IANA root KSK).
-//
-// Current implementation:
-//   Returns nil (passes) so that the rest of the validation pipeline works
-//   during development.  Replace this stub with the dnssec-go or miekg/dns
-//   library calls for production.
-func ValidateDNSSECChain(bundle *types.DNSEvidenceBundle, domain string) error {
-	// TODO(production): Implement full RFC 4035 chain-of-trust verification.
-	// Stub: structural validation is done in ValidateEvidenceBundle above.
-	_ = bundle
-	_ = domain
-	return nil
-}
+// ValidateDNSSECChain is implemented in dnssec_verify.go.

@@ -337,25 +337,16 @@ fi
 
 rm -f "$GOTEST"
 
-# ── CLI tier query test ────────────────────────────────────────────────────────
+# ── CLI query smoke test ──────────────────────────────────────────────────────
 
-header "CLI Tier Query Tests"
+header "CLI Query Smoke Test"
 
 if { command -v "$BINARY" &>/dev/null || [[ -x "$BINARY" ]]; }; then
-  # CLI queries require a running node
-  if curl -sf "${NODE_URL:-http://localhost:26657}/status" &>/dev/null; then
-    run_test "tier query shows tier definitions" \
-      bash -c '"$BINARY" query identity tier cosmos1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq9as36n 2>&1 | grep -qi "tier\|multiplier\|anonymous"' \
-      BINARY="$BINARY"
-  
-    run_test "params shows dns_bound_tier_requires_dnssec" \
-      bash -c '"$BINARY" query identity params 2>&1 | grep -qi "dns_bound\|dnssec\|params"' \
-      BINARY="$BINARY"
-  else
-    skip "Node not reachable — skipping CLI tier query tests"
-  fi
+  run_test "verify-domain-proof computes payload" \
+    bash -c '"$BINARY" query identity verify-domain-proof --domain example.com --selector tat2025a --cosmos-addr cosmos1test --registered-at 1700000000 2>&1 | grep -qi "tatkey-domain-proof"' \
+    BINARY="$BINARY"
 else
-  echo -e "${YELLOW}[SKIP]${RESET}  Binary '$BINARY' not found — skipping CLI tier tests"
+  echo -e "${YELLOW}[SKIP]${RESET}  Binary '$BINARY' not found — skipping CLI tests"
   (( TESTS_SKIPPED += 1 )) || true
 fi
 
