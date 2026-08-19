@@ -296,7 +296,7 @@ localnet-start:
 .PHONY: localnet-stop
 localnet-stop:
 	@echo "  ► Stopping localnet"
-	@pkill -f "$(BINARY) start" 2>/dev/null || true
+	@pkill -f "$(BINARY) [s]tart" 2>/dev/null || true
 	@echo "  ✓ Localnet stopped"
 
 ## localnet-reset: Wipe state and re-initialise devnet

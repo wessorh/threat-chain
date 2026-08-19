@@ -40,6 +40,10 @@ STAKE_AMOUNT="100000000utatst"
 SUPPLY_AMOUNT="200000000utatst"
 KEYRING_BACKEND="test"
 
+# Test keys: funded + authorized for exercising tx commands (publish/endorse/dispute).
+TEST_KEYS="alice bob carol"
+TEST_FUND="10000000utatst"    # 10 TATST each
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 info()    { echo -e "${CYAN}  ►${RESET} $*"; }
@@ -131,11 +135,30 @@ if [[ -n "${VALIDATOR_PUBKEY}" ]]; then
   echo ""
 fi
 
+# ─── Step 2b: Create test keys ─────────────────────────────────────────────
+step "2b. Create test keys (${TEST_KEYS})"
+
+TEST_KEY_ADDRS=()
+for k in ${TEST_KEYS}; do
+  ${TA} keys add "${k}" \
+    --keyring-backend "${KEYRING_BACKEND}" \
+    --output json 2>/tmp/ta-key-${k}.json
+  a=$(${TA} keys show "${k}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null)
+  TEST_KEY_ADDRS+=("${a}")
+  info "  Test key '${k}' = ${a}"
+done
+success "Test keys created (${#TEST_KEY_ADDRS[@]})"
+
 # ─── Step 3: Add genesis account ─────────────────────────────────────────────
 step "3. Add genesis account"
 
 ${TA} add-genesis-account "${VALIDATOR_ADDR}" "${SUPPLY_AMOUNT}"
 success "Genesis account: ${VALIDATOR_ADDR} → ${SUPPLY_AMOUNT}"
+
+for a in "${TEST_KEY_ADDRS[@]}"; do
+  ${TA} add-genesis-account "${a}" "${TEST_FUND}"
+  info "  Genesis account: ${a} → ${TEST_FUND}"
+done
 
 # ─── Step 4: Create genesis validator tx ─────────────────────────────────────
 step "4. Create gentx (self-delegation)"
@@ -157,6 +180,7 @@ success "Gentxs collected"
 step "5. Patch genesis parameters"
 
 GENESIS="${HOME_DIR}/config/genesis.json"
+TEST_KEY_ADDRS_STR="${TEST_KEY_ADDRS[*]}"
 
 python3 << PYEOF
 import json, sys
@@ -197,7 +221,7 @@ slashing["slash_fraction_downtime"] = "0.010000000000000000"
 
 # ── Attestation: sensible local defaults ──
 attest_params = app.setdefault("attestation", {}).setdefault("params", {})
-attest_params["min_attester_delegation"] = "1000000"   # 1 TATST
+attest_params["min_attester_delegation"] = "0"          # 0 = test keys publish without delegation
 attest_params["min_ttl_seconds"] = 3600                # 1 hour
 attest_params["max_ttl_seconds"] = 2592000             # 30 days
 attest_params["max_ttl_ipv4_seconds"] = 86400          # 1 day
@@ -206,6 +230,20 @@ attest_params["max_attestations_per_epoch"] = 1000
 attest_params["dispute_bond_amount"] = "5000000"       # 5 TATST
 attest_params["ipv4_min_confidence"] = 60
 attest_params["timestamp_tolerance_seconds"] = 300
+
+# ── Reputation: pre-authorize test keys for endorse (>=10) / dispute (>=20) ──
+for a in "${TEST_KEY_ADDRS_STR}".split():
+    app.setdefault("reputation", {}).setdefault("reputations", []).append({
+        "attester": a,
+        "score": 100,
+        "tier": 2,
+        "last_decay_block": 0,
+        "total_published": 0,
+        "total_endorsed": 0,
+        "total_disputed": 0,
+        "total_revoked": 0,
+        "blacklisted": False,
+    })
 
 with open("${GENESIS}", "w") as f:
     json.dump(g, f, indent=2)

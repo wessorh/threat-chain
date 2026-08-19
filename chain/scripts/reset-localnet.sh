@@ -54,7 +54,7 @@ if [[ -f "${PID_FILE}" ]]; then
 fi
 
 # Also catch any stray processes
-pkill -f "threatattestd start" 2>/dev/null || true
+pkill -f "threatattestd [s]tart" 2>/dev/null || true
 
 # ─── Wipe home directory ──────────────────────────────────────────────────────
 if [[ -d "${HOME_DIR}" ]]; then
