@@ -143,9 +143,15 @@ for k in ${TEST_KEYS}; do
   ${TA} keys add "${k}" \
     --keyring-backend "${KEYRING_BACKEND}" \
     --output json 2>/tmp/ta-key-${k}.json
+  python3 -c "
+import json
+with open('/tmp/ta-key-${k}.json') as f:
+    d = json.load(f)
+    print('  Test key  :', d.get('address',''))
+    print('  Mnemonic  :', d.get('mnemonic','')[0:40]+'...')
+"
   a=$(${TA} keys show "${k}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null)
   TEST_KEY_ADDRS+=("${a}")
-  info "  Test key '${k}' = ${a}"
 done
 success "Test keys created (${#TEST_KEY_ADDRS[@]})"
 
