@@ -264,6 +264,7 @@ func (s *MsgServer) DisputeAttestation(goCtx context.Context, msg *msgs.MsgDispu
 
 	// Mark attestation as DISPUTED (keeps it in the active index but flags it)
 	rec.Status = types.AttestationStatus_DISPUTED
+	rec.DisputeCount++
 	if err := s.SetAttestation(ctx, rec); err != nil {
 		return nil, err
 	}
