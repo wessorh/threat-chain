@@ -290,7 +290,12 @@ func (s *MsgServer) DisputeAttestation(goCtx context.Context, msg *msgs.MsgDispu
 		sdk.NewAttribute(types.AttributeKeyDisputeGround, msg.Ground.String()),
 	))
 
-	return &msgs.MsgDisputeAttestationResponse{DisputeID: disputeID}, nil
+	count, err := s.CountDisputes(ctx, msg.AttestationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &msgs.MsgDisputeAttestationResponse{DisputeID: disputeID, DisputeCount: count}, nil
 }
 
 // ============================================================

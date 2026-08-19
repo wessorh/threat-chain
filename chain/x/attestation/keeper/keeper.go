@@ -570,6 +570,22 @@ func (k Keeper) IterateDisputes(ctx sdk.Context, cb func(types.DisputeRecord) bo
 	return nil
 }
 
+// CountDisputes returns the number of dispute records filed against an
+// attestation, mirroring CountEndorsements.
+func (k Keeper) CountDisputes(ctx sdk.Context, attestationID string) (uint32, error) {
+	var count uint32
+	err := k.IterateDisputes(ctx, func(d types.DisputeRecord) bool {
+		if d.AttestationID == attestationID {
+			count++
+		}
+		return false
+	})
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // ============================================================
 // Blacklist
 // ============================================================

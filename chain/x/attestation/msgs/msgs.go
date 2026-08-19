@@ -394,7 +394,8 @@ type MsgEndorseAttestationResponse struct {
 type MsgRevokeAttestationResponse struct{}
 
 type MsgDisputeAttestationResponse struct {
-	DisputeID string `json:"dispute_id"`
+	DisputeID    string `json:"dispute_id"`
+	DisputeCount uint32 `json:"dispute_count"`
 }
 
 type MsgUpdateParamsResponse struct{}

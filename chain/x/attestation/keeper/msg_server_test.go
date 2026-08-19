@@ -84,7 +84,7 @@ func TestDisputeIncrementsCount(t *testing.T) {
 	}
 
 	ms := keeper.NewMsgServer(k)
-	_, err := ms.DisputeAttestation(ctx, &msgs.MsgDisputeAttestation{
+	resp, err := ms.DisputeAttestation(ctx, &msgs.MsgDisputeAttestation{
 		Disputer:      validDisputer,
 		AttestationID: "att-1",
 		Ground:        types.DisputeGround_FALSE_POSITIVE,
@@ -92,6 +92,9 @@ func TestDisputeIncrementsCount(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("dispute: %v", err)
+	}
+	if resp.DisputeCount != 1 {
+		t.Fatalf("expected response DisputeCount=1, got %d", resp.DisputeCount)
 	}
 
 	got, err := k.GetAttestation(ctx, "att-1")
