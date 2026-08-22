@@ -86,9 +86,9 @@ MOCKGEN       := $(GOBIN)/mockgen
 # PRIMARY TARGETS
 # =============================================================================
 
-## build: Compile threatattestd binary → bin/threatattestd
+## build: Compile threatattestd and txwatch binaries → bin/
 .PHONY: build
-build: go-mod-verify
+build: build-txwatch
 	@echo "  ► Building $(BINARY) $(GIT_VERSION) ($(GIT_COMMIT))"
 	@mkdir -p $(BIN_DIR)
 	$(GO) build \
@@ -98,6 +98,19 @@ build: go-mod-verify
 		-o $(BIN_DIR)/$(BINARY) \
 		$(CMD_PATH)
 	@echo "  ✓ $(BIN_DIR)/$(BINARY)"
+
+## build-txwatch: Compile the tx event listener → bin/txwatch
+.PHONY: build-txwatch
+build-txwatch: go-mod-verify
+	@echo "  ► Building txwatch"
+	@mkdir -p $(BIN_DIR)
+	$(GO) build \
+		-mod=readonly \
+		-tags "$(BUILD_TAGS)" \
+		-ldflags "$(LDFLAGS)" \
+		-o $(BIN_DIR)/txwatch \
+		./cmd/txwatch
+	@echo "  ✓ $(BIN_DIR)/txwatch"
 
 ## build-race: Build with -race detector enabled
 .PHONY: build-race
