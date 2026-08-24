@@ -112,6 +112,23 @@ build-txwatch: go-mod-verify
 		./cmd/txwatch
 	@echo "  ✓ $(BIN_DIR)/txwatch"
 
+## release-txwatch: Cross-compile txwatch for linux/windows/macOS → dist/
+.PHONY: release-txwatch
+release-txwatch: go-mod-verify
+	@echo "  ► Building txwatch release binaries"
+	@mkdir -p $(DIST_DIR)
+	@for p in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do \
+		os=$${p%/*}; arch=$${p#*/}; ext=""; \
+		[ "$$os" = "windows" ] && ext=".exe"; \
+		echo "    txwatch $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build \
+			-mod=readonly -tags "$(BUILD_TAGS)" -ldflags "-s -w" \
+			-o $(DIST_DIR)/txwatch-$$os-$$arch$$ext ./cmd/txwatch || exit 1; \
+		(cd $(DIST_DIR) && sha256sum txwatch-$$os-$$arch$$ext > txwatch-$$os-$$arch$$ext.sha256); \
+	done
+	@echo "  ✓ $(DIST_DIR)/"
+	@ls -lh $(DIST_DIR)/txwatch-* 2>/dev/null
+
 ## build-race: Build with -race detector enabled
 .PHONY: build-race
 build-race: go-mod-verify

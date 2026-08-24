@@ -51,6 +51,17 @@ make build
 # Output: chain/bin/threatattestd
 ```
 
+### Listen for threats in real time
+
+`txwatch` subscribes to the chain's event stream and prints new threat
+attestations as they are published. See
+**[docs/listening-for-threats.md](docs/listening-for-threats.md)**.
+
+```bash
+make build-txwatch
+./chain/bin/txwatch -publish-only tcp://localhost:26657
+```
+
 ### Run tests
 
 ```bash
