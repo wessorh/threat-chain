@@ -56,7 +56,7 @@ go build -o bin/txwatch ./cmd/txwatch
 ### Default — all transactions
 
 ```bash
-./bin/txwatch tcp://localhost:26657
+./bin/txwatch            # connects to s6l.com:26657 by default
 ```
 
 Prints every transaction (height, tx hash, and each decoded message as JSON).
@@ -65,7 +65,8 @@ Useful for watching all chain activity, not just threats.
 ### Publish-only — threats only
 
 ```bash
-./bin/txwatch -publish-only tcp://localhost:26657
+./bin/txwatch -publish-only                       # s6l.com by default
+./bin/txwatch -publish-only tcp://localhost:26657 # override (e.g. local devnet)
 ```
 
 Filters the stream to `MsgPublishAttestation` transactions and prints one
@@ -75,7 +76,7 @@ compact line per threat.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-node` | `tcp://localhost:26657` | CometBFT RPC node URL |
+| `-node` | `tcp://s6l.com:26657` | CometBFT RPC node URL (default host) |
 | `-publish-only` | `false` | print only attestation publications |
 
 The node URL may also be given as a positional argument

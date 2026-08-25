@@ -13,7 +13,7 @@
 //
 // Flags:
 //
-//	-node          CometBFT RPC node URL (default tcp://localhost:26657)
+//	-node          CometBFT RPC node URL (default tcp://s6l.com:26657)
 //	-publish-only  print only MsgPublishAttestation transactions
 package main
 
@@ -41,7 +41,7 @@ import (
 const publishAction = "/threatattest.attestation.MsgPublishAttestation"
 
 func main() {
-	nodeURL := flag.String("node", "tcp://localhost:26657", "CometBFT RPC node URL")
+	nodeURL := flag.String("node", "tcp://s6l.com:26657", "CometBFT RPC node URL")
 	publishOnly := flag.Bool("publish-only", false, "print only attestation publications")
 	flag.Parse()
 	// Legacy positional form: txwatch tcp://host:26657
