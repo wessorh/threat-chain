@@ -140,11 +140,11 @@ type ThreatAttestApp struct {
 	ConsensusKeeper consensuskeeper.Keeper
 
 	// Custom keepers
-	AttestKeeper    attestkeeper.Keeper
-	RepKeeper       repkeeper.Keeper
-	IPFSKeeper      ipfskeeper.Keeper
-	MintKeeper      mintkeeper.Keeper
-	IdentityKeeper  identitykeeper.Keeper
+	AttestKeeper   attestkeeper.Keeper
+	RepKeeper      repkeeper.Keeper
+	IPFSKeeper     ipfskeeper.Keeper
+	MintKeeper     mintkeeper.Keeper
+	IdentityKeeper identitykeeper.Keeper
 }
 
 // identityTierAdapter adapts the x/identity keeper to the x/attestation
@@ -378,6 +378,7 @@ func NewThreatAttestApp(
 		logger,
 		app.BankKeeper,
 		app.DistrKeeper,
+		&app.AttestKeeper,
 		authtypes.FeeCollectorName,
 	)
 

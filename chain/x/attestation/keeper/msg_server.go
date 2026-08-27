@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"cosmossdk.io/errors"
-	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	"github.com/threatattest/chain/x/attestation/msgs"
 	"github.com/threatattest/chain/x/attestation/types"
@@ -382,77 +380,11 @@ func applyTierToConfidence(rawConfidence uint32, tier int32) uint32 {
 // ClaimReward — attestation incentive pool distribution
 // ============================================================
 
-// ClaimReward allows an attester to claim their share of the attestation
-// module account's incentive pool. Each claim withdraws 1% of the pool
-// balance to prevent draining. A minimum of 1 utatst is always claimable.
-func (s *MsgServer) ClaimReward(goCtx context.Context, msg *msgs.MsgClaimReward) (*msgs.MsgClaimRewardResponse, error) {
-	ctx := sdk.UnwrapSDKContext(goCtx)
-
-	if err := msg.ValidateBasic(); err != nil {
-		return nil, err
-	}
-
-	attester, err := sdk.AccAddressFromBech32(msg.Attester)
-	if err != nil {
-		return nil, err
-	}
-
-	// Rate-limit claims to one per attester per epoch.
-	epoch := types.CurrentEpoch(ctx.BlockHeight())
-	lastClaim, err := s.Keeper.GetClaimEpoch(ctx, msg.Attester)
-	if err != nil {
-		return nil, err
-	}
-	if lastClaim == epoch && s.Keeper.HasClaimEpoch(ctx, msg.Attester) {
-		return nil, errors.Wrap(types.ErrRateLimitExceeded, "already claimed this epoch")
-	}
-
-	// Get attestation module account balance
-	modAddr := authtypes.NewModuleAddress(types.ModuleName)
-	poolBal := s.Keeper.bankKeeper.SpendableCoins(ctx, modAddr)
-
-	if poolBal.IsZero() {
-		return nil, errors.Wrap(types.ErrIncentivePoolEmpty, "incentive pool is empty")
-	}
-
-	// Calculate reward: 1% of pool per claim, clamped to the available balance.
-	denom := sdk.DefaultBondDenom
-	available := poolBal.AmountOf(denom)
-	reward := available.QuoRaw(100)
-	if reward.IsZero() {
-		reward = math.NewInt(1) // minimum 1 utatst
-	}
-	if reward.GT(available) {
-		reward = available
-	}
-	rewardCoins := sdk.NewCoins(sdk.NewCoin(denom, reward))
-
-	// Send reward from attestation module to attester
-	if err := s.Keeper.bankKeeper.SendCoinsFromModuleToAccount(
-		ctx,
-		types.ModuleName,
-		attester,
-		rewardCoins,
-	); err != nil {
-		return nil, errors.Wrapf(err, "failed to send reward to %s", msg.Attester)
-	}
-
-	if err := s.Keeper.SetClaimEpoch(ctx, msg.Attester, epoch); err != nil {
-		return nil, err
-	}
-
-	// Emit event
-	ctx.EventManager().EmitEvent(sdk.NewEvent(
-		types.EventTypeClaimReward,
-		sdk.NewAttribute(types.AttributeKeyAttester, msg.Attester),
-		sdk.NewAttribute("reward_amount", rewardCoins.String()),
-	))
-
-	remaining := s.Keeper.bankKeeper.SpendableCoins(ctx, modAddr)
-	return &msgs.MsgClaimRewardResponse{
-		ClaimedAmount: rewardCoins.String(),
-		PoolRemaining: remaining.String(),
-	}, nil
+// ClaimReward is disabled: attester rewards are distributed automatically at
+// each epoch boundary via BeginBlocker (DistributeEpochRewards), so there is
+// no manual claim to perform.
+func (s *MsgServer) ClaimReward(_ context.Context, _ *msgs.MsgClaimReward) (*msgs.MsgClaimRewardResponse, error) {
+	return nil, errors.Wrap(types.ErrRewardsAutomatic, "rewards are distributed automatically at each epoch boundary")
 }
 
 // ============================================================

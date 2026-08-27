@@ -28,14 +28,21 @@ type DistributionKeeper interface {
 	FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error
 }
 
+// AttesterMintReporter records the attester-share minted each block so the
+// attestation module can track its per-epoch replenishment.
+type AttesterMintReporter interface {
+	RecordAttesterMint(ctx sdk.Context, amount int64) error
+}
+
 // Keeper provides state access for the tatmint module.
 type Keeper struct {
-	cdc          codec.BinaryCodec
-	storeService store.KVStoreService
-	logger       log.Logger
-	bankKeeper   BankKeeper
-	distKeeper   DistributionKeeper
-	feeCollector string // module account name for validator rewards
+	cdc                  codec.BinaryCodec
+	storeService         store.KVStoreService
+	logger               log.Logger
+	bankKeeper           BankKeeper
+	distKeeper           DistributionKeeper
+	attesterMintReporter AttesterMintReporter
+	feeCollector         string // module account name for validator rewards
 }
 
 // NewKeeper constructs a new tatmint Keeper.
@@ -45,15 +52,17 @@ func NewKeeper(
 	logger log.Logger,
 	bankKeeper BankKeeper,
 	distKeeper DistributionKeeper,
+	attesterMintReporter AttesterMintReporter,
 	feeCollector string,
 ) Keeper {
 	return Keeper{
-		cdc:          cdc,
-		storeService: storeService,
-		logger:       logger.With("module", types.ModuleName),
-		bankKeeper:   bankKeeper,
-		distKeeper:   distKeeper,
-		feeCollector: feeCollector,
+		cdc:                  cdc,
+		storeService:         storeService,
+		logger:               logger.With("module", types.ModuleName),
+		bankKeeper:           bankKeeper,
+		distKeeper:           distKeeper,
+		attesterMintReporter: attesterMintReporter,
+		feeCollector:         feeCollector,
 	}
 }
 
@@ -225,6 +234,11 @@ func (k Keeper) MintBlockReward(ctx sdk.Context) error {
 			sdk.NewCoins(sdk.NewInt64Coin(types.MintDenom, attesterShare)),
 		); err != nil {
 			return fmt.Errorf("route attester share: %w", err)
+		}
+		if k.attesterMintReporter != nil {
+			if err := k.attesterMintReporter.RecordAttesterMint(ctx, attesterShare); err != nil {
+				return fmt.Errorf("record attester mint: %w", err)
+			}
 		}
 	}
 

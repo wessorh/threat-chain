@@ -131,10 +131,18 @@ func (d AttesterRateLimitDecorator) AnteHandle(
 		return ctx, errors.Wrap(sdkerrors.ErrLogic, "failed to read epoch count")
 	}
 
-	// Ensure adding this tx's publish messages won't exceed the limit
-	if count+uint32(publishCount) > params.MaxAttestationsPerEpoch {
+	// Ensure adding this tx's publish messages won't exceed the limit.
+	limit := params.MaxAttestationsPerEpoch // legacy fallback
+	if params.MaxAttestationsPerDay > 0 {
+		rs, err := d.attestKeeper.GetAttesterRS(ctx, attester)
+		if err != nil {
+			return ctx, errors.Wrap(sdkerrors.ErrLogic, "failed to load reputation score")
+		}
+		limit = attesttypes.MaxAttestationsPerEpochForScore(params.MaxAttestationsPerDay, rs)
+	}
+	if count+uint32(publishCount) > limit {
 		return ctx, errors.Wrapf(attesttypes.ErrRateLimitExceeded,
-			"epoch=%d count=%d limit=%d", epoch, count, params.MaxAttestationsPerEpoch)
+			"epoch=%d count=%d limit=%d", epoch, count, limit)
 	}
 
 	return next(ctx, tx, simulate)

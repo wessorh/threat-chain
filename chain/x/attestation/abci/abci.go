@@ -24,6 +24,12 @@ func BeginBlocker(ctx sdk.Context, k keeper.Keeper) error {
 	}
 
 	if currentEpoch > storedEpoch {
+		// Distribute the previous epoch's replenishment pro-rata to its
+		// participants, then prune its rate-limit counters.
+		if err := k.DistributeEpochRewards(ctx, storedEpoch); err != nil {
+			k.Logger().Error("failed to distribute epoch rewards",
+				"epoch", storedEpoch, "error", err)
+		}
 		// Epoch has advanced — prune the previous epoch's rate-limit counters
 		if err := k.PruneEpochCounts(ctx, storedEpoch); err != nil {
 			k.Logger().Error("failed to prune epoch counts",

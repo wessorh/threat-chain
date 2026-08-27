@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	"github.com/threatattest/chain/x/attestation/keeper"
 	"github.com/threatattest/chain/x/attestation/msgs"
@@ -276,19 +275,11 @@ func TestUnsubscribe(t *testing.T) {
 
 // ── ClaimReward ─────────────────────────────────────────────────────────────
 
-func TestClaimReward(t *testing.T) {
-	modAddr := authtypes.NewModuleAddress(types.ModuleName).String()
-	bank := &testutil.MockBankKeeper{Balances: map[string]sdk.Coins{
-		modAddr: sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 1_000_000)),
-	}}
-	k, ctx := testutil.NewKeeper(t, 100, bank)
+func TestClaimRewardDisabled(t *testing.T) {
+	k, ctx := testutil.NewKeeper(t, 100, nil)
 	ms := keeper.NewMsgServer(k)
 
-	resp, err := ms.ClaimReward(ctx, &msgs.MsgClaimReward{Attester: validOther})
-	if err != nil {
-		t.Fatalf("claim reward: %v", err)
-	}
-	if resp.ClaimedAmount == "" {
-		t.Fatal("expected claimed amount")
+	if _, err := ms.ClaimReward(ctx, &msgs.MsgClaimReward{Attester: validOther}); err == nil {
+		t.Fatal("expected error: rewards are distributed automatically")
 	}
 }

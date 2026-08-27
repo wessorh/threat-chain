@@ -75,4 +75,6 @@ var (
 	ErrInvalidHollomanSignature       = errors.Register(ModuleName, 56, "invalid holloman signature (must be 32 lowercase hex chars)")
 	ErrInvalidHammingMask             = errors.Register(ModuleName, 57, "invalid hamming mask (must be 0-128)")
 	ErrHollomanSignatureRequired      = errors.Register(ModuleName, 58, "holloman_signature is required for EMAIL_BODY artifacts")
+	ErrNotAttester                    = errors.Register(ModuleName, 59, "attester has not published any attestations")
+	ErrRewardsAutomatic               = errors.Register(ModuleName, 60, "rewards are distributed automatically at each epoch boundary")
 )

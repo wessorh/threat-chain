@@ -40,6 +40,10 @@ const (
 
 	// Blocks per epoch (~1 hour at 2 s block time)
 	BlocksPerEpoch = int64(1800)
+
+	// EpochsPerDay is the nominal number of 30-minute epochs in a 24-hour day.
+	// Used to spread the daily attestation ceiling across epochs.
+	EpochsPerDay uint32 = 48
 )
 
 // ============================================================
@@ -527,6 +531,9 @@ type Params struct {
 	MaxTTLIPv4Seconds       int64  `json:"max_ttl_ipv4_seconds"`
 	MaxDetectionRules       uint32 `json:"max_detection_rules"`
 	MaxAttestationsPerEpoch uint32 `json:"max_attestations_per_epoch"`
+	// MaxAttestationsPerDay is the daily attestation ceiling for the top
+	// reputation grade (tier 3). Lower grades get a fraction.
+	MaxAttestationsPerDay uint32 `json:"max_attestations_per_day"`
 	// DisputeBondAmount is the bond (in utatst) required to open a dispute.
 	DisputeBondAmount         string `json:"dispute_bond_amount"`
 	IPv4MinConfidence         uint32 `json:"ipv4_min_confidence"`
@@ -546,6 +553,7 @@ func DefaultParams() Params {
 		MaxTTLIPv4Seconds:         MaxTTLIPv4Seconds,
 		MaxDetectionRules:         32,
 		MaxAttestationsPerEpoch:   100,
+		MaxAttestationsPerDay:     1_000_000,
 		DisputeBondAmount:         "500000000", // 500 TATST in utatst
 		IPv4MinConfidence:         30,
 		TimestampToleranceSeconds: 300,
@@ -930,6 +938,31 @@ func CurrentEpoch(blockHeight int64) uint64 {
 		return 0
 	}
 	return uint64(blockHeight) / uint64(BlocksPerEpoch)
+}
+
+// MaxAttestationsPerEpochForScore returns the per-epoch attestation allowance
+// for an attester with the given reputation score, scaling a daily ceiling by
+// reputation grade and spreading it across the day's epochs.
+//
+//	grade               daily fraction   (mirrors x/reputation ComputeTier)
+//	tier 3 (>= 500 RS)  100%
+//	tier 2 (100-499)    10%
+//	tier 1 (< 100)      1%
+func MaxAttestationsPerEpochForScore(daily, score uint32) uint32 {
+	var perDay uint32
+	switch {
+	case score >= 500:
+		perDay = daily
+	case score >= 100:
+		perDay = daily / 10
+	default:
+		perDay = daily / 100
+	}
+	perEpoch := perDay / EpochsPerDay
+	if perEpoch == 0 {
+		perEpoch = 1
+	}
+	return perEpoch
 }
 
 // ============================================================

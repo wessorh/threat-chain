@@ -8,19 +8,21 @@ const (
 	RouterKey  = ModuleName
 
 	// KVStore key prefixes
-	AttestationKeyPrefix = 0x00
-	ArtifactIndexPrefix  = 0x01
-	AttesterIndexPrefix  = 0x02
-	ExpiryQueuePrefix    = 0x03
-	EpochCountPrefix     = 0x04
-	ParamsKey            = 0x05
-	DisputeKeyPrefix     = 0x06
-	BlacklistPrefix      = 0x07
-	EndorserSetPrefix    = 0x08
-	EpochNumberKey       = 0x09
-	SubscriptionPrefix   = 0x0A
-	ClaimEpochPrefix     = 0x0B
-	HollomanIndexPrefix  = 0x0C
+	AttestationKeyPrefix     = 0x00
+	ArtifactIndexPrefix      = 0x01
+	AttesterIndexPrefix      = 0x02
+	ExpiryQueuePrefix        = 0x03
+	EpochCountPrefix         = 0x04
+	ParamsKey                = 0x05
+	DisputeKeyPrefix         = 0x06
+	BlacklistPrefix          = 0x07
+	EndorserSetPrefix        = 0x08
+	EpochNumberKey           = 0x09
+	SubscriptionPrefix       = 0x0A
+	ClaimEpochPrefix         = 0x0B
+	HollomanIndexPrefix      = 0x0C
+	EpochTotalCountPrefix    = 0x0D
+	EpochReplenishmentPrefix = 0x0E
 )
 
 // Key builders
@@ -50,6 +52,18 @@ func EpochCountKey(epoch uint64, attester string) []byte {
 	key := []byte{EpochCountPrefix}
 	key = append(key, encodeUint64BigEndian(epoch)...)
 	key = append(key, []byte(attester)...)
+	return key
+}
+
+func EpochTotalCountKey(epoch uint64) []byte {
+	key := []byte{EpochTotalCountPrefix}
+	key = append(key, encodeUint64BigEndian(epoch)...)
+	return key
+}
+
+func EpochReplenishmentKey(epoch uint64) []byte {
+	key := []byte{EpochReplenishmentPrefix}
+	key = append(key, encodeUint64BigEndian(epoch)...)
 	return key
 }
 

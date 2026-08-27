@@ -463,6 +463,122 @@ func (k Keeper) IncrementEpochCount(ctx sdk.Context, epoch uint64, attester stri
 	return kvStore.Set(types.EpochCountKey(epoch, attester), b)
 }
 
+// GetEpochTotalCount returns the total attestations published in the epoch.
+func (k Keeper) GetEpochTotalCount(ctx sdk.Context, epoch uint64) (uint32, error) {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := kvStore.Get(types.EpochTotalCountKey(epoch))
+	if err != nil {
+		return 0, err
+	}
+	if bz == nil {
+		return 0, nil
+	}
+	return binary.BigEndian.Uint32(bz), nil
+}
+
+// IncrementEpochTotalCount bumps the per-epoch total attestation counter.
+func (k Keeper) IncrementEpochTotalCount(ctx sdk.Context, epoch uint64) error {
+	count, err := k.GetEpochTotalCount(ctx, epoch)
+	if err != nil {
+		return err
+	}
+	count++
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, count)
+	return k.storeService.OpenKVStore(ctx).Set(types.EpochTotalCountKey(epoch), b)
+}
+
+// GetEpochReplenishment returns the total attester-share minted for the epoch.
+func (k Keeper) GetEpochReplenishment(ctx sdk.Context, epoch uint64) (uint64, error) {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	bz, err := kvStore.Get(types.EpochReplenishmentKey(epoch))
+	if err != nil {
+		return 0, err
+	}
+	if bz == nil {
+		return 0, nil
+	}
+	return binary.BigEndian.Uint64(bz), nil
+}
+
+// AddEpochReplenishment adds amount to the epoch's replenishment total.
+func (k Keeper) AddEpochReplenishment(ctx sdk.Context, epoch uint64, amount int64) error {
+	cur, err := k.GetEpochReplenishment(ctx, epoch)
+	if err != nil {
+		return err
+	}
+	cur += uint64(amount)
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, cur)
+	return k.storeService.OpenKVStore(ctx).Set(types.EpochReplenishmentKey(epoch), b)
+}
+
+// RecordAttesterMint records the attester-share minted for the current block.
+// It is called by x/tatmint's MintBlockReward via the AttesterMintReporter
+// interface.
+func (k Keeper) RecordAttesterMint(ctx sdk.Context, amount int64) error {
+	epoch := types.CurrentEpoch(ctx.BlockHeight())
+	return k.AddEpochReplenishment(ctx, epoch, amount)
+}
+
+// DistributeEpochRewards distributes the epoch's attester-share replenishment
+// pro-rata to the attesters who published in that epoch. It is called at the
+// epoch boundary, before the epoch's counters are pruned.
+func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) error {
+	replenished, err := k.GetEpochReplenishment(ctx, epoch)
+	if err != nil {
+		return err
+	}
+	if replenished == 0 {
+		return nil
+	}
+	totalCount, err := k.GetEpochTotalCount(ctx, epoch)
+	if err != nil {
+		return err
+	}
+	if totalCount == 0 {
+		return nil
+	}
+
+	kvStore := k.storeService.OpenKVStore(ctx)
+	prefix := make([]byte, 9)
+	prefix[0] = types.EpochCountPrefix
+	binary.BigEndian.PutUint64(prefix[1:], epoch)
+
+	iter, err := kvStore.Iterator(prefix, prefixEndBytes(prefix))
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if len(key) <= 9 {
+			continue
+		}
+		attester := string(key[9:])
+		count := binary.BigEndian.Uint32(iter.Value())
+		if count == 0 {
+			continue
+		}
+
+		reward := replenished * uint64(count) / uint64(totalCount)
+		if reward == 0 {
+			continue
+		}
+
+		addr, err := sdk.AccAddressFromBech32(attester)
+		if err != nil {
+			continue
+		}
+		coins := sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(reward)))
+		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins); err != nil {
+			return fmt.Errorf("distribute reward to %s: %w", attester, err)
+		}
+	}
+	return nil
+}
+
 // PruneEpochCounts removes all epoch-count entries for a given epoch.
 // Called from EndBlocker when the epoch rolls over.
 func (k Keeper) PruneEpochCounts(ctx sdk.Context, epoch uint64) error {
@@ -671,13 +787,21 @@ func (k Keeper) PublishAttestationRecord(ctx sdk.Context, rec types.AttestationR
 		return types.ErrAttesterBlacklisted
 	}
 
-	// Check epoch rate limit
+	// Check epoch rate limit (tier-scaled daily ceiling when configured).
 	epoch := types.CurrentEpoch(ctx.BlockHeight())
 	count, err := k.GetEpochCount(ctx, epoch, rec.Attester)
 	if err != nil {
 		return err
 	}
-	if count >= params.MaxAttestationsPerEpoch {
+	limit := params.MaxAttestationsPerEpoch // legacy fallback
+	if params.MaxAttestationsPerDay > 0 {
+		rs, err := k.repKeeper.GetReputationScore(ctx, rec.Attester)
+		if err != nil {
+			return err
+		}
+		limit = types.MaxAttestationsPerEpochForScore(params.MaxAttestationsPerDay, rs)
+	}
+	if count >= limit {
 		return types.ErrRateLimitExceeded
 	}
 
@@ -715,6 +839,9 @@ func (k Keeper) PublishAttestationRecord(ctx sdk.Context, rec types.AttestationR
 
 	// Bump epoch counter
 	if err := k.IncrementEpochCount(ctx, epoch, rec.Attester); err != nil {
+		return err
+	}
+	if err := k.IncrementEpochTotalCount(ctx, epoch); err != nil {
 		return err
 	}
 
