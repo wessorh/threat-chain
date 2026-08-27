@@ -7,6 +7,9 @@
 // messages). With -publish-only it subscribes only to attestation
 // publications and prints a compact one-line summary of each.
 //
+// The connection is monitored: if the subscription drops or a periodic health
+// check fails, txwatch reconnects automatically (with backoff).
+//
 // Usage:
 //
 //	txwatch [flags] [tcp://host:26657]
@@ -26,6 +29,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	tmclient "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cometbft/cometbft/types"
@@ -40,6 +44,9 @@ import (
 // event attribute for MsgPublishAttestation (see msgs.XXX_MessageName).
 const publishAction = "/threatattest.attestation.MsgPublishAttestation"
 
+// healthInterval is how often txwatch verifies the node is still reachable.
+const healthInterval = 30 * time.Second
+
 func main() {
 	nodeURL := flag.String("node", "tcp://s6l.com:26657", "CometBFT RPC node URL")
 	publishOnly := flag.Bool("publish-only", false, "print only attestation publications")
@@ -52,15 +59,6 @@ func main() {
 	enc := app.MakeEncodingConfig()
 	txDecoder := enc.TxConfig.TxDecoder()
 
-	cli, err := tmclient.New(*nodeURL, "/websocket")
-	if err != nil {
-		fatal("connect: %v", err)
-	}
-	if err := cli.Start(); err != nil {
-		fatal("start websocket: %v", err)
-	}
-	defer func() { _ = cli.Stop() }()
-
 	query := "tm.event='Tx'"
 	mode := "transactions"
 	if *publishOnly {
@@ -68,19 +66,64 @@ func main() {
 		mode = "attestation publications"
 	}
 
-	txs, err := cli.Subscribe(context.Background(), "txwatch", query)
-	if err != nil {
-		fatal("subscribe: %v", err)
-	}
-
-	fmt.Printf("watching for %s on %s (Ctrl-C to quit)\n", mode, *nodeURL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fmt.Println("shutting down")
+		cancel()
+	}()
+
+	fmt.Printf("watching for %s on %s (Ctrl-C to quit)\n", mode, *nodeURL)
+
+	// Reconnect loop: retry with backoff whenever the watch returns.
+	backoff := time.Second
+	for {
+		err := watch(ctx, *nodeURL, query, *publishOnly, enc, txDecoder)
+		if ctx.Err() != nil {
+			return
+		}
+		fmt.Fprintf(os.Stderr, "txwatch: %v — reconnecting in %v\n", err, backoff)
+		select {
+		case <-time.After(backoff):
+		case <-ctx.Done():
+			return
+		}
+		if backoff < 30*time.Second {
+			backoff *= 2
+		}
+	}
+}
+
+// watch connects, subscribes, and streams transactions until the subscription
+// drops, a periodic health check fails, or ctx is cancelled. It returns an
+// error so the caller can reconnect.
+func watch(ctx context.Context, nodeURL, query string, publishOnly bool, enc app.EncodingConfig, txDecoder sdk.TxDecoder) error {
+	cli, err := tmclient.New(nodeURL, "/websocket")
+	if err != nil {
+		return err
+	}
+	if err := cli.Start(); err != nil {
+		return err
+	}
+
+	txs, err := cli.Subscribe(ctx, "txwatch", query)
+	if err != nil {
+		return err
+	}
+
+	health := time.NewTicker(healthInterval)
+	defer health.Stop()
 
 	for {
 		select {
-		case evt := <-txs:
+		case evt, ok := <-txs:
+			if !ok {
+				return fmt.Errorf("subscription channel closed")
+			}
 			data, ok := evt.Data.(types.EventDataTx)
 			if !ok {
 				continue
@@ -96,15 +139,23 @@ func main() {
 				continue
 			}
 
-			if *publishOnly {
+			if publishOnly {
 				printPublish(data, tx, hashStr)
 			} else {
 				printTx(data, tx, enc, hashStr)
 			}
 
-		case <-sigCh:
-			fmt.Println("shutting down")
-			return
+		case <-health.C:
+			// Verify the node is still reachable; if not, drop out and reconnect.
+			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			_, err := cli.Status(checkCtx)
+			cancel()
+			if err != nil {
+				return fmt.Errorf("health check failed: %w", err)
+			}
+
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 }
@@ -157,9 +208,4 @@ func publishEventAttrs(data types.EventDataTx) map[string]string {
 		}
 	}
 	return out
-}
-
-func fatal(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
 }
