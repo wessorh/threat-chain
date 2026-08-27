@@ -260,6 +260,20 @@ func (s *MsgServer) DisputeAttestation(goCtx context.Context, msg *msgs.MsgDispu
 		return nil, err
 	}
 
+	// Escrow the dispute bond (forfeited if the dispute is rejected).
+	disputerAddr, err := sdk.AccAddressFromBech32(msg.Disputer)
+	if err != nil {
+		return nil, err
+	}
+	bond, err := s.Keeper.disputeBond(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Keeper.bankKeeper.SendCoinsFromAccountToModule(ctx, disputerAddr, types.ModuleName, bond); err != nil {
+		return nil, errors.Wrapf(types.ErrInsufficientDisputeBond,
+			"escrow bond %s: %v", params.DisputeBondAmount, err)
+	}
+
 	// Mark attestation as DISPUTED (keeps it in the active index but flags it)
 	rec.Status = types.AttestationStatus_DISPUTED
 	rec.DisputeCount++

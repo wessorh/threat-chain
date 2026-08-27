@@ -521,8 +521,40 @@ func (k Keeper) RecordAttesterMint(ctx sdk.Context, amount int64) error {
 	return k.AddEpochReplenishment(ctx, epoch, amount)
 }
 
+// countActiveAttestations returns the number of ACTIVE attestations published
+// by an attester — the "accuracy" signal: only undisputed, unrevoked
+// attestations still count toward an attester's reward weight.
+func (k Keeper) countActiveAttestations(ctx sdk.Context, attester string) uint64 {
+	ids, err := k.GetAttesterIndex(ctx, attester)
+	if err != nil {
+		return 0
+	}
+	var count uint64
+	for _, id := range ids {
+		rec, err := k.GetAttestation(ctx, id)
+		if err == nil && rec.Status == types.AttestationStatus_ACTIVE {
+			count++
+		}
+	}
+	return count
+}
+
+// reputationWeight returns a reputation-tier multiplier (1/2/3) used to scale
+// an attester's reward share, mirroring x/reputation's ComputeTier thresholds.
+func reputationWeight(score uint32) uint64 {
+	switch {
+	case score >= 500:
+		return 3
+	case score >= 100:
+		return 2
+	default:
+		return 1
+	}
+}
+
 // DistributeEpochRewards distributes the epoch's attester-share replenishment
-// pro-rata to the attesters who published in that epoch. It is called at the
+// pro-rata to the attesters who published in that epoch, weighted by their
+// active (accurate) attestation count and reputation tier. It is called at the
 // epoch boundary, before the epoch's counters are pruned.
 func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) error {
 	replenished, err := k.GetEpochReplenishment(ctx, epoch)
@@ -532,13 +564,15 @@ func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) error {
 	if replenished == 0 {
 		return nil
 	}
-	totalCount, err := k.GetEpochTotalCount(ctx, epoch)
-	if err != nil {
-		return err
+
+	// First pass: compute each publisher's accuracy- and reputation-weighted
+	// share (active attestations × reputation tier).
+	type share struct {
+		attester string
+		weight   uint64
 	}
-	if totalCount == 0 {
-		return nil
-	}
+	var shares []share
+	var totalWeight uint64
 
 	kvStore := k.storeService.OpenKVStore(ctx)
 	prefix := make([]byte, 9)
@@ -557,23 +591,41 @@ func (k Keeper) DistributeEpochRewards(ctx sdk.Context, epoch uint64) error {
 			continue
 		}
 		attester := string(key[9:])
-		count := binary.BigEndian.Uint32(iter.Value())
-		if count == 0 {
+		if binary.BigEndian.Uint32(iter.Value()) == 0 {
 			continue
 		}
 
-		reward := replenished * uint64(count) / uint64(totalCount)
+		active := k.countActiveAttestations(ctx, attester)
+		if active == 0 {
+			continue
+		}
+		rs, err := k.repKeeper.GetReputationScore(ctx, attester)
+		if err != nil {
+			rs = 0
+		}
+		weight := active * reputationWeight(rs)
+
+		shares = append(shares, share{attester: attester, weight: weight})
+		totalWeight += weight
+	}
+
+	if totalWeight == 0 {
+		return nil
+	}
+
+	// Second pass: distribute pro-rata.
+	for _, sh := range shares {
+		reward := replenished * sh.weight / totalWeight
 		if reward == 0 {
 			continue
 		}
-
-		addr, err := sdk.AccAddressFromBech32(attester)
+		addr, err := sdk.AccAddressFromBech32(sh.attester)
 		if err != nil {
 			continue
 		}
 		coins := sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(reward)))
 		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins); err != nil {
-			return fmt.Errorf("distribute reward to %s: %w", attester, err)
+			return fmt.Errorf("distribute reward to %s: %w", sh.attester, err)
 		}
 	}
 	return nil
@@ -930,8 +982,13 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 		return err
 	}
 
-	// Slight reputation penalty for revocation (self-correction is still valuable)
-	_ = k.repKeeper.SubReputation(ctx, attester, 2)
+	// No reputation penalty: self-correction is encouraged, not punished.
+
+	// Resolve any open disputes as UPHELD (the attester admitted it was wrong)
+	// and refund each disputer's escrowed bond.
+	if err := k.refundOpenDisputes(ctx, id); err != nil {
+		return err
+	}
 
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeRevokeAttestation,
@@ -939,6 +996,41 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 		sdk.NewAttribute(types.AttributeKeyAttester, attester),
 	))
 	return nil
+}
+
+// disputeBond returns the escrowed dispute bond as coins (bond denom).
+func (k Keeper) disputeBond(ctx sdk.Context) (sdk.Coins, error) {
+	params, err := k.GetParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+	amt, ok := math.NewIntFromString(params.DisputeBondAmount)
+	if !ok {
+		return nil, fmt.Errorf("invalid dispute bond amount %q", params.DisputeBondAmount)
+	}
+	return sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, amt)), nil
+}
+
+// refundOpenDisputes resolves all open disputes on an attestation as UPHELD
+// (the attester revoked it, admitting it was wrong) and refunds each disputer's
+// escrowed bond.
+func (k Keeper) refundOpenDisputes(ctx sdk.Context, attestationID string) error {
+	bond, err := k.disputeBond(ctx)
+	if err != nil {
+		return err
+	}
+	return k.IterateDisputes(ctx, func(d types.DisputeRecord) bool {
+		if d.AttestationID != attestationID || d.Status != types.DisputeStatus_OPEN {
+			return false
+		}
+		d.Status = types.DisputeStatus_RESOLVED_UPHELD
+		d.ResolvedAt = ctx.BlockTime().Unix()
+		_ = k.SetDispute(ctx, d)
+		if disputer, err := sdk.AccAddressFromBech32(d.Disputer); err == nil {
+			_ = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, disputer, bond)
+		}
+		return false
+	})
 }
 
 // EndorseAttestationRecord adds an endorsement and bumps the endorsement count.
