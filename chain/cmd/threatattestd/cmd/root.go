@@ -869,6 +869,7 @@ func queryCommand() *cobra.Command {
 		rpc.ValidatorCommand(),
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
+		bankQueryCmds(),
 		attestationQueryCmds(),
 		identitycli.NewQueryCmd(),
 		ipfsverifycli.NewQueryCmd(),
