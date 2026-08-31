@@ -8,7 +8,9 @@
 // publications and prints a compact one-line summary of each.
 //
 // The connection is monitored: if the subscription drops or a periodic health
-// check fails, txwatch reconnects automatically (with backoff).
+// check fails, txwatch reconnects automatically (with backoff). The health
+// check also watches a NewBlockHeader feed as a liveness signal, so a
+// silently-dead websocket (e.g. after a node redeploy) is detected and healed.
 //
 // Usage:
 //
@@ -18,6 +20,7 @@
 //
 //	-node          CometBFT RPC node URL (default tcp://s6l.com:26657)
 //	-publish-only  print only MsgPublishAttestation transactions
+//	-debug         verbose diagnostic logging to stderr (connection, health, feed liveness)
 package main
 
 import (
@@ -47,9 +50,18 @@ const publishAction = "/threatattest.attestation.MsgPublishAttestation"
 // healthInterval is how often txwatch verifies the node is still reachable.
 const healthInterval = 30 * time.Second
 
+// maxBlockGap is how many blocks behind the node's latest height our websocket
+// feed may lag before we treat it as stale and reconnect. The node emits a
+// block header every block (even empty ones), so a healthy feed never lags
+// more than a couple of blocks; 10 gives a comfortable margin against network
+// jitter while still catching a silently-dead subscription within one health
+// interval (~30s).
+const maxBlockGap int64 = 10
+
 func main() {
 	nodeURL := flag.String("node", "tcp://s6l.com:26657", "CometBFT RPC node URL")
 	publishOnly := flag.Bool("publish-only", false, "print only attestation publications")
+	debug := flag.Bool("debug", false, "enable verbose diagnostic logging to stderr")
 	flag.Parse()
 	// Legacy positional form: txwatch tcp://host:26657
 	if flag.NArg() > 0 {
@@ -78,11 +90,14 @@ func main() {
 	}()
 
 	fmt.Printf("watching for %s on %s (Ctrl-C to quit)\n", mode, *nodeURL)
+	if *debug {
+		fmt.Fprintf(os.Stderr, "[debug] diagnostics enabled\n")
+	}
 
 	// Reconnect loop: retry with backoff whenever the watch returns.
 	backoff := time.Second
 	for {
-		err := watch(ctx, *nodeURL, query, *publishOnly, enc, txDecoder)
+		err := watch(ctx, *nodeURL, query, *publishOnly, *debug, enc, txDecoder)
 		if ctx.Err() != nil {
 			return
 		}
@@ -101,7 +116,7 @@ func main() {
 // watch connects, subscribes, and streams transactions until the subscription
 // drops, a periodic health check fails, or ctx is cancelled. It returns an
 // error so the caller can reconnect.
-func watch(ctx context.Context, nodeURL, query string, publishOnly bool, enc app.EncodingConfig, txDecoder sdk.TxDecoder) error {
+func watch(ctx context.Context, nodeURL, query string, publishOnly, debug bool, enc app.EncodingConfig, txDecoder sdk.TxDecoder) error {
 	cli, err := tmclient.New(nodeURL, "/websocket")
 	if err != nil {
 		return err
@@ -114,15 +129,29 @@ func watch(ctx context.Context, nodeURL, query string, publishOnly bool, enc app
 	if err != nil {
 		return err
 	}
+	logDebug(debug, "subscribed to transactions: %s", query)
+
+	// A second subscription to NewBlockHeader is the liveness signal: the node
+	// emits a block header every block (even empty ones), so a feed that stops
+	// delivering headers while the node is still advancing means the websocket
+	// died silently. The HTTP Status check alone cannot see that.
+	blocks, err := cli.Subscribe(ctx, "txwatch-blocks", "tm.event='NewBlockHeader'")
+	if err != nil {
+		return err
+	}
+	logDebug(debug, "subscribed to block headers for liveness")
 
 	health := time.NewTicker(healthInterval)
 	defer health.Stop()
+
+	var lastBlockHeight int64
+	var lastBlockLog time.Time
 
 	for {
 		select {
 		case evt, ok := <-txs:
 			if !ok {
-				return fmt.Errorf("subscription channel closed")
+				return fmt.Errorf("tx subscription channel closed")
 			}
 			data, ok := evt.Data.(types.EventDataTx)
 			if !ok {
@@ -145,19 +174,59 @@ func watch(ctx context.Context, nodeURL, query string, publishOnly bool, enc app
 				printTx(data, tx, enc, hashStr)
 			}
 
+		case evt, ok := <-blocks:
+			if !ok {
+				return fmt.Errorf("block subscription channel closed")
+			}
+			if data, ok := evt.Data.(types.EventDataNewBlockHeader); ok {
+				lastBlockHeight = data.Header.Height
+				if debug && time.Since(lastBlockLog) >= 10*time.Second {
+					logDebug(debug, "block feed alive at height %d", lastBlockHeight)
+					lastBlockLog = time.Now()
+				}
+			}
+
 		case <-health.C:
-			// Verify the node is still reachable; if not, drop out and reconnect.
-			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			_, err := cli.Status(checkCtx)
-			cancel()
-			if err != nil {
-				return fmt.Errorf("health check failed: %w", err)
+			if err := checkHealth(ctx, cli, lastBlockHeight, debug); err != nil {
+				return err
 			}
 
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
+}
+
+// checkHealth verifies the node is reachable and that the websocket feed is
+// still live. The HTTP Status call alone cannot detect a silently-dead event
+// subscription, so we compare the node's latest height against the last block
+// header actually received: if the node has advanced well past our feed, the
+// subscription is stale and the caller reconnects.
+func checkHealth(ctx context.Context, cli *tmclient.HTTP, lastBlockHeight int64, debug bool) error {
+	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	status, err := cli.Status(checkCtx)
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+	latest := status.SyncInfo.LatestBlockHeight
+	gap := latest - lastBlockHeight
+	logDebug(debug, "health: node_height=%d last_seen=%d gap=%d", latest, lastBlockHeight, gap)
+	if gap > maxBlockGap {
+		return fmt.Errorf("websocket feed stale: node at height %d but last block seen is %d",
+			latest, lastBlockHeight)
+	}
+	return nil
+}
+
+// logDebug prints a diagnostic line to stderr when debug logging is enabled.
+// stdout is reserved for transaction output, so diagnostics always go to
+// stderr regardless of mode.
+func logDebug(debug bool, format string, args ...interface{}) {
+	if !debug {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "[debug] "+format+"\n", args...)
 }
 
 // printTx prints every message in a transaction as JSON (default mode).
