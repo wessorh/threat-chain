@@ -25,9 +25,9 @@ type MsgPublishAttestation struct {
 	// For FILE: SHA-256 of the raw file bytes.
 	// For EMAIL_BODY: SHA-256 of the normalized body bytes.
 	ArtifactSHA256 string `json:"artifact_sha256"`
-	// HollomanSignature is the 128-bit holloman perceptual fingerprint (32 hex
-	// chars) for near-duplicate matching. Optional for FILE/URL; required for
-	// EMAIL_BODY.
+	// HollomanSignature is the holloman perceptual fingerprint in
+	// "<order>.<32hex>" cluster-id form (Hilbert order + 128-bit fingerprint).
+	// Optional for FILE/URL; required for EMAIL_BODY.
 	HollomanSignature string `json:"holloman_signature,omitempty"`
 	// HammingMask is the holloman hamming-mask suffix (0-128). The attestation
 	// matches any artifact whose fingerprint is within this Hamming distance of

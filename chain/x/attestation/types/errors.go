@@ -72,7 +72,7 @@ var (
 	ErrIncentivePoolEmpty             = errors.Register(ModuleName, 53, "incentive pool is empty")
 	ErrSubscriptionNotFound           = errors.Register(ModuleName, 54, "subscription not found")
 	ErrInvalidTier                    = errors.Register(ModuleName, 55, "invalid subscription tier")
-	ErrInvalidHollomanSignature       = errors.Register(ModuleName, 56, "invalid holloman signature (must be 32 lowercase hex chars)")
+	ErrInvalidHollomanSignature       = errors.Register(ModuleName, 56, "invalid holloman signature (must be 32 lowercase hex chars or <order>.<32hex>)")
 	ErrInvalidHammingMask             = errors.Register(ModuleName, 57, "invalid hamming mask (must be 0-128)")
 	ErrHollomanSignatureRequired      = errors.Register(ModuleName, 58, "holloman_signature is required for EMAIL_BODY artifacts")
 	ErrNotAttester                    = errors.Register(ModuleName, 59, "attester has not published any attestations")

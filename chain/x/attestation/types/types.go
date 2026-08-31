@@ -458,9 +458,9 @@ type AttestationRecord struct {
 	ArtifactType  ArtifactType `json:"artifact_type"`
 	// ArtifactSHA256 is the hex-encoded SHA-256 of the artifact.
 	ArtifactSHA256 string `json:"artifact_sha256"`
-	// HollomanSignature is the 128-bit holloman perceptual fingerprint (32 hex
-	// chars) used for near-duplicate matching. Optional for FILE/URL; required
-	// for EMAIL_BODY.
+	// HollomanSignature is the holloman perceptual fingerprint in
+	// "<order>.<32hex>" cluster-id form (Hilbert order + 128-bit fingerprint).
+	// Optional for FILE/URL; required for EMAIL_BODY.
 	HollomanSignature string `json:"holloman_signature,omitempty"`
 	// HammingMask is the holloman hamming-mask suffix (0-128): the attestation
 	// matches any artifact whose fingerprint is within this Hamming distance of
@@ -620,13 +620,42 @@ func IsValidSHA256Hex(s string) bool {
 	return true
 }
 
-// IsValidHollomanSignature returns true if s is a valid lowercase 32-char hex
-// string (a 128-bit holloman perceptual fingerprint).
+// IsValidHollomanSignature returns true if s is a valid holloman signature in
+// the "<order>.<32hex>" cluster-id form: a single lowercase alphanumeric
+// Hilbert-order character, a dot, and 32 lowercase hex chars. A bare 32-hex
+// fingerprint without an order prefix is NOT valid.
 func IsValidHollomanSignature(s string) bool {
+	order, hexPart := splitHollomanSignature(s)
+	return order != "" && isValidHollomanOrder(order) && isValidHollomanHex(hexPart)
+}
+
+// splitHollomanSignature splits a holloman signature into its Hilbert-order
+// prefix and the 32-hex fingerprint. A legacy bare fingerprint (no order) has
+// an empty order prefix.
+func splitHollomanSignature(s string) (order, hexPart string) {
+	if i := strings.IndexByte(s, '.'); i >= 0 {
+		return s[:i], s[i+1:]
+	}
+	return "", s
+}
+
+// isValidHollomanOrder returns true if o is a single lowercase alphanumeric
+// character encoding a Hilbert curve order (e.g. "h" encodes order 7).
+func isValidHollomanOrder(o string) bool {
+	if len(o) != 1 {
+		return false
+	}
+	c := o[0]
+	return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
+// isValidHollomanHex returns true if s is exactly 32 lowercase hex chars.
+func isValidHollomanHex(s string) bool {
 	if len(s) != 32 {
 		return false
 	}
-	for _, c := range s {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return false
 		}
@@ -640,16 +669,23 @@ func IsValidHammingMask(d int32) bool {
 }
 
 // HollomanHammingDistance returns the bitwise Hamming distance between two
-// 128-bit holloman signatures (32-char lowercase hex strings).
+// holloman signatures (128-bit fingerprints). Signatures carry a Hilbert-order
+// prefix; the distance is only meaningful within the same order, so signatures
+// with different orders are treated as incomparable (reported as an error).
 func HollomanHammingDistance(a, b string) (int, error) {
 	if !IsValidHollomanSignature(a) || !IsValidHollomanSignature(b) {
 		return 0, fmt.Errorf("invalid holloman signature")
 	}
-	ab, err := hex.DecodeString(a)
+	orderA, hexA := splitHollomanSignature(a)
+	orderB, hexB := splitHollomanSignature(b)
+	if orderA != orderB {
+		return 0, fmt.Errorf("holloman signature order mismatch: %q vs %q", orderA, orderB)
+	}
+	ab, err := hex.DecodeString(hexA)
 	if err != nil {
 		return 0, err
 	}
-	bb, err := hex.DecodeString(b)
+	bb, err := hex.DecodeString(hexB)
 	if err != nil {
 		return 0, err
 	}

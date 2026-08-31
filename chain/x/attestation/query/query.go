@@ -113,7 +113,7 @@ type QueryIsMaliciousIPv4Request struct {
 // QueryIsMaliciousHollomanRequest looks up by holloman perceptual signature
 // with an optional query-side hamming mask (tolerance radius).
 type QueryIsMaliciousHollomanRequest struct {
-	// HollomanSignature is the 128-bit holloman fingerprint (32 lowercase hex).
+	// HollomanSignature is the holloman fingerprint in "<order>.<32hex>" form.
 	HollomanSignature string `json:"holloman_signature"`
 	// HammingMask is the query-side tolerance (0-128). A stored attestation
 	// matches when its fingerprint is within (this mask + its own stored mask)

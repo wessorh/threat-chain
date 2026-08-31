@@ -248,7 +248,7 @@ Examples:
 	cmd.Flags().String("artifact-type", "FILE",
 		"Artifact type: FILE or EMAIL_BODY")
 	cmd.Flags().String("holloman-signature", "",
-		"128-bit holloman perceptual fingerprint (32 lowercase hex chars) for near-duplicate matching")
+		"128-bit holloman perceptual fingerprint (<order>.<32hex>) for near-duplicate matching")
 	cmd.Flags().Int32("hamming-mask", 0,
 		"Holloman hamming-mask radius (0-128); the attestation matches fingerprints within this Hamming distance")
 
@@ -329,17 +329,8 @@ func runAttestFile(cmd *cobra.Command, args []string) error {
 	if hammingMask < 0 || hammingMask > 128 {
 		return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
 	}
-	if hollomanSig != "" {
-		valid := len(hollomanSig) == 32
-		for _, c := range hollomanSig {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars")
-		}
+	if hollomanSig != "" && !attesttypes.IsValidHollomanSignature(hollomanSig) {
+		return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars or <order>.<32hex>")
 	}
 	if artifactType == "EMAIL_BODY" && hollomanSig == "" {
 		return fmt.Errorf("--holloman-signature is required for EMAIL_BODY artifacts")
@@ -501,7 +492,7 @@ Examples:
 	cmd.Flags().String("chain-id", "threatattest-1", "Chain ID to embed in the spec")
 	cmd.Flags().Bool("dry-run", false, "Validate and print the spec without writing to disk")
 	cmd.Flags().String("holloman-signature", "",
-		"128-bit holloman perceptual fingerprint (32 lowercase hex chars) for near-duplicate matching")
+		"128-bit holloman perceptual fingerprint (<order>.<32hex>) for near-duplicate matching")
 	cmd.Flags().Int32("hamming-mask", 0,
 		"Holloman hamming-mask radius (0-128)")
 	return cmd
@@ -524,17 +515,8 @@ func runAttestURL(cmd *cobra.Command, args []string) error {
 	if hammingMask < 0 || hammingMask > 128 {
 		return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
 	}
-	if hollomanSig != "" {
-		valid := len(hollomanSig) == 32
-		for _, c := range hollomanSig {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-				valid = false
-				break
-			}
-		}
-		if !valid {
-			return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars")
-		}
+	if hollomanSig != "" && !attesttypes.IsValidHollomanSignature(hollomanSig) {
+		return fmt.Errorf("invalid --holloman-signature: must be 32 lowercase hex chars or <order>.<32hex>")
 	}
 
 	// Read flags
@@ -1105,7 +1087,7 @@ func isMaliciousHollomanCmd() *cobra.Command {
 			return clientCtx.PrintProto(res)
 		},
 	}
-	cmd.Flags().String("holloman-signature", "", "128-bit holloman fingerprint (32 hex chars, required)")
+	cmd.Flags().String("holloman-signature", "", "128-bit holloman fingerprint (<order>.<32hex>, required)")
 	cmd.Flags().Int32("hamming-mask", 0, "Hamming tolerance radius (0-128)")
 	flags.AddQueryFlagsToCmd(cmd)
 	return cmd
@@ -1329,7 +1311,7 @@ Examples:
 				return fmt.Errorf("invalid --hamming-mask %d: must be 0-128", hammingMask)
 			}
 			if hollomanSig != "" && !attesttypes.IsValidHollomanSignature(hollomanSig) {
-				return errors.New("invalid --holloman-signature: must be 32 lowercase hex chars")
+				return errors.New("invalid --holloman-signature: must be 32 lowercase hex chars or <order>.<32hex>")
 			}
 			if artifactType == "EMAIL_BODY" && hollomanSig == "" {
 				return errors.New("--holloman-signature is required for EMAIL_BODY artifacts")
@@ -1392,7 +1374,7 @@ Examples:
 	cmd.Flags().String("raw-value", "",
 		"Raw value for URL/IPV4/DOMAIN artifacts (sha256 will be computed automatically); for EMAIL_BODY it is the body text")
 	cmd.Flags().String("holloman-signature", "",
-		"128-bit holloman perceptual fingerprint (32 lowercase hex chars; required for EMAIL_BODY)")
+		"128-bit holloman perceptual fingerprint (<order>.<32hex>; required for EMAIL_BODY)")
 	cmd.Flags().Int32("hamming-mask", 0,
 		"Holloman hamming-mask radius (0-128); the attestation matches fingerprints within this Hamming distance")
 	cmd.Flags().String("severity", "MEDIUM",
