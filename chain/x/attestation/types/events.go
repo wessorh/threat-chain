@@ -25,4 +25,5 @@ const (
 	AttributeKeySeverity       = "severity"
 	AttributeKeyTLP            = "tlp"
 	AttributeKeyExpiresAt      = "expires_at"
+	AttributeKeyRevokeReason   = "revoke_reason"
 )

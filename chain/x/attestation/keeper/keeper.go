@@ -329,56 +329,84 @@ func (k Keeper) RemoveHollomanIndexEntry(ctx sdk.Context, signature, attestation
 // Attester Index  (attester_address → []attestation_id)
 // ============================================================
 
-// SetAttesterIndex stores the list of attestation IDs published by an attester.
-func (k Keeper) SetAttesterIndex(ctx sdk.Context, attester string, ids []string) error {
+// migrateAttesterIndex converts the legacy JSON-list attester index (a single
+// JSON array stored under the bare attester key) into per-attestation prefix
+// entries. It is a no-op once the legacy key has been migrated/removed.
+func (k Keeper) migrateAttesterIndex(ctx sdk.Context, attester string) error {
 	kvStore := k.storeService.OpenKVStore(ctx)
-	bz, err := json.Marshal(ids)
+	legacyKey := types.AttesterIndexKey(attester)
+	bz, err := kvStore.Get(legacyKey)
 	if err != nil {
-		return fmt.Errorf("marshal attester index: %w", err)
-	}
-	return kvStore.Set(types.AttesterIndexKey(attester), bz)
-}
-
-// GetAttesterIndex returns all attestation IDs published by an attester.
-func (k Keeper) GetAttesterIndex(ctx sdk.Context, attester string) ([]string, error) {
-	kvStore := k.storeService.OpenKVStore(ctx)
-	bz, err := kvStore.Get(types.AttesterIndexKey(attester))
-	if err != nil {
-		return nil, err
+		return err
 	}
 	if bz == nil {
-		return nil, nil
+		return nil
 	}
 	var ids []string
 	if err := json.Unmarshal(bz, &ids); err != nil {
-		return nil, fmt.Errorf("unmarshal attester index: %w", err)
+		return fmt.Errorf("unmarshal legacy attester index: %w", err)
+	}
+	for _, id := range ids {
+		if err := kvStore.Set(types.AttesterIndexEntryKey(attester, id), []byte{0x01}); err != nil {
+			return err
+		}
+	}
+	return kvStore.Delete(legacyKey)
+}
+
+// GetAttesterIndex returns all attestation IDs published by an attester by
+// iterating the per-attestation prefix entries.
+func (k Keeper) GetAttesterIndex(ctx sdk.Context, attester string) ([]string, error) {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	if err := k.migrateAttesterIndex(ctx, attester); err != nil {
+		return nil, err
+	}
+	prefix := types.AttesterIndexPrefixKey(attester)
+	iter, err := kvStore.Iterator(prefix, prefixEndBytes(prefix))
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	var ids []string
+	for ; iter.Valid(); iter.Next() {
+		ids = append(ids, string(iter.Key()[len(prefix):]))
 	}
 	return ids, nil
 }
 
-// AddAttesterIndexEntry appends an attestation ID to the attester index.
-func (k Keeper) AddAttesterIndexEntry(ctx sdk.Context, attester, attestationID string) error {
-	ids, err := k.GetAttesterIndex(ctx, attester)
-	if err != nil {
+// SetAttesterIndex writes the given attestation IDs for an attester as
+// individual prefix entries. Used by tests and genesis import to seed the
+// index; publishing uses AddAttesterIndexEntry instead.
+func (k Keeper) SetAttesterIndex(ctx sdk.Context, attester string, ids []string) error {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	if err := k.migrateAttesterIndex(ctx, attester); err != nil {
 		return err
 	}
-	ids = append(ids, attestationID)
-	return k.SetAttesterIndex(ctx, attester, ids)
-}
-
-// RemoveAttesterIndexEntry removes a specific attestation ID from the attester index.
-func (k Keeper) RemoveAttesterIndexEntry(ctx sdk.Context, attester, attestationID string) error {
-	ids, err := k.GetAttesterIndex(ctx, attester)
-	if err != nil {
-		return err
-	}
-	filtered := ids[:0]
 	for _, id := range ids {
-		if id != attestationID {
-			filtered = append(filtered, id)
+		if err := kvStore.Set(types.AttesterIndexEntryKey(attester, id), []byte{0x01}); err != nil {
+			return err
 		}
 	}
-	return k.SetAttesterIndex(ctx, attester, filtered)
+	return nil
+}
+
+// AddAttesterIndexEntry adds a single attester→attestation entry (O(1)).
+func (k Keeper) AddAttesterIndexEntry(ctx sdk.Context, attester, attestationID string) error {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	if err := k.migrateAttesterIndex(ctx, attester); err != nil {
+		return err
+	}
+	return kvStore.Set(types.AttesterIndexEntryKey(attester, attestationID), []byte{0x01})
+}
+
+// RemoveAttesterIndexEntry deletes a single attester→attestation entry (O(1)).
+func (k Keeper) RemoveAttesterIndexEntry(ctx sdk.Context, attester, attestationID string) error {
+	kvStore := k.storeService.OpenKVStore(ctx)
+	if err := k.migrateAttesterIndex(ctx, attester); err != nil {
+		return err
+	}
+	return kvStore.Delete(types.AttesterIndexEntryKey(attester, attestationID))
 }
 
 // ============================================================
@@ -915,16 +943,14 @@ func (k Keeper) PublishAttestationRecord(ctx sdk.Context, rec types.AttestationR
 	return nil
 }
 
-// ExpireAttestation marks an attestation EXPIRED and removes it from indexes.
+// ExpireAttestation removes an attestation whose TTL has elapsed. Expired
+// attestations are no longer actionable (endorsements and disputes both require
+// ACTIVE), so the record and every one of its index entries are deleted rather
+// than retained with an EXPIRED status. This bounds state growth to the set of
+// active attestations (publish rate × max TTL) instead of accumulating forever.
 func (k Keeper) ExpireAttestation(ctx sdk.Context, id string) error {
 	rec, err := k.GetAttestation(ctx, id)
 	if err != nil {
-		return err
-	}
-
-	// Mark expired
-	rec.Status = types.AttestationStatus_EXPIRED
-	if err := k.SetAttestation(ctx, rec); err != nil {
 		return err
 	}
 
@@ -945,14 +971,32 @@ func (k Keeper) ExpireAttestation(ctx sdk.Context, id string) error {
 		}
 	}
 
+	// Remove from attester index
+	if err := k.RemoveAttesterIndexEntry(ctx, rec.Attester, id); err != nil {
+		return err
+	}
+
+	// Delete the record itself.
+	if err := k.DeleteAttestation(ctx, id); err != nil {
+		return err
+	}
+
+	// Emit the event after deletion, carrying the full context that is no longer
+	// resolvable from the record once it is gone.
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeExpireAttestation,
 		sdk.NewAttribute(types.AttributeKeyAttestationID, id),
+		sdk.NewAttribute(types.AttributeKeyAttester, rec.Attester),
+		sdk.NewAttribute(types.AttributeKeyArtifactType, rec.ArtifactType.String()),
+		sdk.NewAttribute(types.AttributeKeyArtifactSHA256, rec.ArtifactSHA256),
 	))
 	return nil
 }
 
-// RevokeAttestationRecord revokes an attestation by the original attester.
+// RevokeAttestationRecord revokes an attestation by the original attester and
+// deletes it. A revoked attestation is no longer actionable (disputes require
+// ACTIVE), so like expiry the record and all of its index entries are removed
+// rather than retained with a REVOKED status — this keeps state growth bounded.
 func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason string) error {
 	rec, err := k.GetAttestation(ctx, id)
 	if err != nil {
@@ -965,11 +1009,6 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 		return errors.Wrapf(types.ErrAlreadyRevoked, "status=%s", rec.Status.String())
 	}
 
-	rec.Status = types.AttestationStatus_REVOKED
-	rec.RevokeReason = reason
-	if err := k.SetAttestation(ctx, rec); err != nil {
-		return err
-	}
 	if err := k.RemoveArtifactIndexEntry(ctx, rec.ArtifactSHA256, id); err != nil {
 		return err
 	}
@@ -981,6 +1020,9 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 	if err := k.DequeueExpiry(ctx, rec.ExpiresAt, id); err != nil {
 		return err
 	}
+	if err := k.RemoveAttesterIndexEntry(ctx, rec.Attester, id); err != nil {
+		return err
+	}
 
 	// No reputation penalty: self-correction is encouraged, not punished.
 
@@ -990,10 +1032,20 @@ func (k Keeper) RevokeAttestationRecord(ctx sdk.Context, id, attester, reason st
 		return err
 	}
 
+	// Delete the record itself.
+	if err := k.DeleteAttestation(ctx, id); err != nil {
+		return err
+	}
+
+	// Emit the event after deletion, carrying the full context (including the
+	// reason) that is no longer resolvable from the record once it is gone.
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeRevokeAttestation,
 		sdk.NewAttribute(types.AttributeKeyAttestationID, id),
 		sdk.NewAttribute(types.AttributeKeyAttester, attester),
+		sdk.NewAttribute(types.AttributeKeyArtifactType, rec.ArtifactType.String()),
+		sdk.NewAttribute(types.AttributeKeyArtifactSHA256, rec.ArtifactSHA256),
+		sdk.NewAttribute(types.AttributeKeyRevokeReason, reason),
 	))
 	return nil
 }

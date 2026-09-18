@@ -69,19 +69,35 @@ func TestRevokeAttestation(t *testing.T) {
 		t.Fatalf("revoke: %v", err)
 	}
 
-	got, err := k.GetAttestation(ctx, "att-1")
-	if err != nil {
-		t.Fatalf("get: %v", err)
+	// The record is deleted, not retained with a REVOKED status.
+	if _, err := k.GetAttestation(ctx, "att-1"); err == nil {
+		t.Fatal("expected attestation to be deleted after revoke")
 	}
-	if got.Status != types.AttestationStatus_REVOKED {
-		t.Fatalf("expected REVOKED, got %v", got.Status)
-	}
-	if got.RevokeReason != "false positive confirmed" {
-		t.Fatalf("reason mismatch: %q", got.RevokeReason)
-	}
+
 	ids, _ := k.GetArtifactIndex(ctx, sha)
 	if len(ids) != 0 {
 		t.Fatalf("expected artifact index removed, got %v", ids)
+	}
+
+	attIDs, _ := k.GetAttesterIndex(ctx, validAttester)
+	if len(attIDs) != 0 {
+		t.Fatalf("expected attester index removed, got %v", attIDs)
+	}
+
+	// The revoke reason is preserved on the emitted event.
+	found := false
+	for _, ev := range ctx.EventManager().Events() {
+		if ev.Type != types.EventTypeRevokeAttestation {
+			continue
+		}
+		for _, a := range ev.Attributes {
+			if a.Key == types.AttributeKeyRevokeReason && a.Value == "false positive confirmed" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected revoke_reason event attribute with the reason")
 	}
 }
 

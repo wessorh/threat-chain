@@ -39,6 +39,25 @@ func AttesterIndexKey(attester string) []byte {
 	return append([]byte{AttesterIndexPrefix}, []byte(attester)...)
 }
 
+// AttesterIndexPrefixKey returns the prefix for all per-attestation entries of
+// a single attester. The 0x00 separator keeps it distinct from the legacy
+// AttesterIndexKey (a single JSON list stored under the bare attester key).
+func AttesterIndexPrefixKey(attester string) []byte {
+	key := []byte{AttesterIndexPrefix}
+	key = append(key, []byte(attester)...)
+	key = append(key, 0x00)
+	return key
+}
+
+// AttesterIndexEntryKey returns the key for a single attester→attestation
+// entry. Storing one key per attestation (instead of a growing JSON list)
+// makes publishing O(1) in the attester's index size.
+func AttesterIndexEntryKey(attester, attestationID string) []byte {
+	key := AttesterIndexPrefixKey(attester)
+	key = append(key, []byte(attestationID)...)
+	return key
+}
+
 // ExpiryQueueKey encodes expiry timestamp (big-endian uint64) + attestation_id
 // so range iteration yields entries in chronological expiry order.
 func ExpiryQueueKey(expiresAt int64, attestationID string) []byte {
