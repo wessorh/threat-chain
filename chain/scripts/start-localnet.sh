@@ -37,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --binary) BINARY="$2"; shift ;;
     --home)   HOME_DIR="$2"; shift ;;
     --log)    LOG_FILE="$2"; shift ;;
+    --pid)    PID_FILE="$2"; shift ;;
     --fg)     FOREGROUND=true ;;
     -h|--help)
       sed -n 's/^# //p' "$0" | head -20
@@ -136,4 +137,12 @@ else
       print('Block #'+d.get('result',{}).get('block',{}).get('header',{}).get('height','?'))" \
     2>/dev/null || echo "Block: pending")
   info "${BLOCK}"
+
+  # Emit the running app version so a stale binary is caught immediately.
+  # abci_info returns the version the app committed to the chain; a bare
+  # `go build` (no -ldflags version stamp) reports it as empty/None.
+  APP_VERSION=$(curl -sf http://localhost:26657/abci_info 2>/dev/null | \
+    python3 -c "import sys,json; print(json.load(sys.stdin).get('result',{}).get('response',{}).get('version','?'))" \
+    2>/dev/null || echo "unknown")
+  info "App version: ${APP_VERSION}"
 fi

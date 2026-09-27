@@ -74,6 +74,12 @@ KEY_NAME      := localkey
 DENOM         := utatst
 HOME_DIR      := $(HOME)/.threatattestd-local
 
+# ─── Mainnet config ──────────────────────────────────────────────────────────
+MAINNET_CHAIN_ID := threatattest-1
+MAINNET_MONIKER  := threatattest-main
+MAINNET_KEY      := validator
+MAINNET_HOME     := $(HOME)/.threatattestd
+
 # ─── Lint ────────────────────────────────────────────────────────────────────
 LINT          := $(GOBIN)/golangci-lint
 LINT_VERSION  := v1.59.1
@@ -345,6 +351,70 @@ localnet-reset: localnet-stop
 .PHONY: localnet-log
 localnet-log:
 	@tail -f /tmp/threatattestd-local.log
+
+# =============================================================================
+# MAINNET
+# =============================================================================
+
+## mainnet-init: Initialise a fresh mainnet node (chain-id: threatattest-1)
+.PHONY: mainnet-init
+mainnet-init: build
+	@echo "  ► Initialising mainnet (chain-id: $(MAINNET_CHAIN_ID))"
+	@bash scripts/init-mainnet.sh \
+		--binary  $(BIN_DIR)/$(BINARY) \
+		--home    $(MAINNET_HOME) \
+		--chain   $(MAINNET_CHAIN_ID) \
+		--moniker $(MAINNET_MONIKER) \
+		--key     $(MAINNET_KEY) \
+		--denom   $(DENOM)
+
+## mainnet-start: Start the mainnet node (background)
+.PHONY: mainnet-start
+mainnet-start:
+	@echo "  ► Starting mainnet"
+	@bash scripts/start-localnet.sh \
+		--binary $(BIN_DIR)/$(BINARY) \
+		--home   $(MAINNET_HOME) \
+		--log    /tmp/threatattestd-main.log \
+		--pid    /tmp/threatattestd-main.pid
+
+## mainnet-stop: Stop the mainnet node
+.PHONY: mainnet-stop
+mainnet-stop:
+	@echo "  ► Stopping mainnet"
+	@if [[ -f /tmp/threatattestd-main.pid ]]; then \
+		kill "$$(cat /tmp/threatattestd-main.pid)" 2>/dev/null || true; \
+		rm -f /tmp/threatattestd-main.pid; \
+	fi
+	@echo "  ✓ Mainnet stopped"
+
+## mainnet-reset: Wipe and re-initialise mainnet
+.PHONY: mainnet-reset
+mainnet-reset: mainnet-stop
+	@echo "  ► Resetting mainnet"
+	@bash scripts/reset-localnet.sh \
+		--binary  $(BIN_DIR)/$(BINARY) \
+		--home    $(MAINNET_HOME) \
+		--chain   $(MAINNET_CHAIN_ID) \
+		--moniker $(MAINNET_MONIKER) \
+		--key     $(MAINNET_KEY) \
+		--denom   $(DENOM)
+
+## mainnet-log: Tail the mainnet log
+.PHONY: mainnet-log
+mainnet-log:
+	@tail -f /tmp/threatattestd-main.log
+
+## mainnet-status: Query mainnet node status
+.PHONY: mainnet-status
+mainnet-status:
+	@$(BIN_DIR)/$(BINARY) status --node tcp://localhost:26657 2>&1 | \
+		python3 -c "import sys,json; d=json.load(sys.stdin); \
+			r=d.get('result',d); \
+			print('Chain ID :', r.get('node_info',{}).get('network','?')); \
+			print('Height   :', r.get('sync_info',{}).get('latest_block_height','?')); \
+			print('Catching :', r.get('sync_info',{}).get('catching_up','?'))" 2>/dev/null \
+		|| $(BIN_DIR)/$(BINARY) status --node tcp://localhost:26657
 
 ## localnet-status: Query localnet node status
 .PHONY: localnet-status

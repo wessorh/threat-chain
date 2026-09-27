@@ -168,6 +168,42 @@ localnet-status:
 localnet-log:
 	$(MAKE) -C $(CHAIN_DIR) localnet-log
 
+# ── Mainnet ───────────────────────────────────────────────────────────────────
+
+## mainnet: Init + start single-node mainnet
+.PHONY: mainnet
+mainnet: mainnet-init mainnet-start
+
+## mainnet-init: Initialise mainnet (chain-id: threatattest-1)
+.PHONY: mainnet-init
+mainnet-init:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-init
+
+## mainnet-start: Start mainnet node
+.PHONY: mainnet-start
+mainnet-start:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-start
+
+## mainnet-stop: Stop mainnet node
+.PHONY: mainnet-stop
+mainnet-stop:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-stop
+
+## mainnet-reset: Wipe and reinitialise mainnet
+.PHONY: mainnet-reset
+mainnet-reset:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-reset
+
+## mainnet-status: Query mainnet node status
+.PHONY: mainnet-status
+mainnet-status:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-status
+
+## mainnet-log: Tail mainnet node log
+.PHONY: mainnet-log
+mainnet-log:
+	$(MAKE) -C $(CHAIN_DIR) mainnet-log
+
 # ── Docker ────────────────────────────────────────────────────────────────────
 
 ## docker-build: Build Docker image
