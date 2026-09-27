@@ -130,7 +130,7 @@ changelog:
 release:
   github:
     owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-    name:  chain
+    name:  threat-chain
 
   draft:      false
   prerelease: auto   # mark as pre-release if version contains -rc, -beta, etc.
