@@ -72,7 +72,7 @@ jobs:
           distribution: goreleaser
           version:       latest
           args:          release --clean
-          workdir:       threatattest
+          workdir:       chain
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name:  goreleaser-dist
-          path:  threatattest/dist/
+          path:  chain/dist/
           retention-days: 30
 
   # ─── Browser Extension packaging ─────────────────────────────────────────
@@ -126,8 +126,8 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           files: |
-            threatattest-extension/build/threatattest-shield-*.zip
-            threatattest-extension/build/threatattest-shield-*.zip.sha256
+            extension/build/threatattest-shield-*.zip
+            extension/build/threatattest-shield-*.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -170,8 +170,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context:    threatattest
-          file:       threatattest/Dockerfile
+          context:    chain
+          file:       chain/Dockerfile
           platforms:  linux/amd64,linux/arm64
           push:       true
           tags:       ${{ steps.meta.outputs.tags }}
